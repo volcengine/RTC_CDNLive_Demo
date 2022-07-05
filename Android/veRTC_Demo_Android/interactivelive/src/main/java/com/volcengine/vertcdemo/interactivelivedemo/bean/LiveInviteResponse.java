@@ -1,0 +1,31 @@
+package com.volcengine.vertcdemo.interactivelivedemo.bean;
+
+import com.google.gson.annotations.SerializedName;
+import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+
+import java.util.List;
+
+public class LiveInviteResponse implements RTMBizResponse {
+
+    @SerializedName("rtc_app_id")
+    public String rtcAppId;
+    @SerializedName("rtc_room_id")
+    public String rtcRoomId;
+    @SerializedName("rtc_token")
+    public String rtcToken;
+    @SerializedName("linker_id")
+    public String linkerId;
+    @SerializedName("rtc_user_list")
+    public List<LiveUserInfo> userList;
+
+    @Override
+    public String toString() {
+        return "LiveInviteResponse{" +
+                "rtcAppId='" + rtcAppId + '\'' +
+                ", rtcRoomId='" + rtcRoomId + '\'' +
+                ", rtcToken='" + rtcToken + '\'' +
+                ", linkerId='" + linkerId + '\'' +
+                ", userList=" + userList +
+                '}';
+    }
+}
