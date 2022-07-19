@@ -4,7 +4,6 @@ source 'https://github.com/volcengine/volcengine-specs.git'
 # RTC SDK
 pod 'VolcEngineRTC', '~> 3.41.101'
 
-
 target 'veRTC_Demo' do
   platform :ios, '12.0'
   # 依赖 SDK
@@ -21,11 +20,9 @@ target 'veRTC_Demo' do
   # Scene source code
   # 登录
   pod 'Login', :path => '../veRTC_Demo_iOS/APP/Login'
-
   
   # 互动直播
   pod 'LiveDemo', :path => '../veRTC_Demo_iOS/APP/LiveDemo'
-  pod 'Player', :path => '../veRTC_Demo_iOS/APP/Player'    #开源
-
+  pod 'Player', :path => '../veRTC_Demo_iOS/APP/Player'
 end
 

@@ -22,11 +22,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) LiveRoomStatus status;
 @property (nonatomic, assign) NSInteger audienceCount;
 @property (nonatomic, copy) NSDictionary<NSString *, NSString *> *streamPullStreamList;
-
-// 仅在 liveCreateLive/liveJoinLiveRoom 接口赋值
 @property (nonatomic, strong) NSString *rtmToken;
-// 只在liveStartLive 与 liveJoinLiveRoom 接口赋值
 @property (nonatomic, strong) LiveUserModel *hostUserModel;
+@property (nonatomic, strong) NSString *rtcToken;
+@property (nonatomic, strong) NSString *rtcRoomId;
 
 @end
 

@@ -19,7 +19,8 @@
              @"anchorUserName" : @"host_user_name",
              @"status" : @"status",
              @"audienceCount" : @"audience_count",
-             @"streamPullStreamList" : @"stream_pull_url_list"};
+             @"streamPullStreamList" : @"stream_pull_url_list",
+    };
 }
 
 @end

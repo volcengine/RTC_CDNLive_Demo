@@ -21,7 +21,15 @@ typedef NS_ENUM(NSInteger, LiveNetworkQualityStatus) {
     LiveNetworkQualityStatusBad,
 };
 
+typedef NS_ENUM(NSUInteger, RTCMixStatus) {
+    RTCMixStatusSingleLive = 0,
+    RTCMixStatusAddGuests,
+    RTCMixStatusCoHost,
+};
+
 @interface LiveRTCManager : BaseRTCManager
+
+@property (nonatomic, copy, nullable) void (^onUserPublishStreamBlock)(NSString *uid);
 
 /*
  * Singleton
@@ -29,9 +37,34 @@ typedef NS_ENUM(NSInteger, LiveNetworkQualityStatus) {
 + (LiveRTCManager *_Nullable)shareRtc;
 
 /*
- * Set the push stream address and configuration parameters
+ * Start mix stream retweet
+ * @param pushUrl Retweeted CDN address
+ * @param hostUser Anchor model
+ * @param roomId RTC room id
  */
-- (void)configEngineWithPushUrl:(NSString *)pushUrl;
+
+- (void)startMixStreamRetweetWithPushUrl:(NSString *)pushUrl
+                                hostUser:(LiveUserModel *)hostUser
+                               rtcRoomId:(NSString *)rtcRoomId;
+
+/*
+ * update transcoding
+ */
+- (void)updateTranscodingLayout:(NSArray<LiveUserModel *> *)userList
+                      mixStatus:(RTCMixStatus)mixStatus
+                      rtcRoomId:(NSString *)rtcRoomId;
+
+/*
+ * Start retweeting audio and video streams across rooms
+ * @param roomId Other room ID
+ * @param token Other room token
+ */
+- (void)startForwardStreamToRooms:(NSString *)roomId token:(NSString *)token;
+
+/*
+ * Stop retweeting audio and video streams across rooms
+ */
+- (void)stopForwardStreamToRooms;
 
 /*
  * Leave the room
@@ -85,19 +118,9 @@ typedef NS_ENUM(NSInteger, LiveNetworkQualityStatus) {
 - (void)startCapture;
 
 /*
- * Start push
- */
-- (void)startPush:(void (^__nullable)(BOOL isStarted))block;
-
-/*
  * Stop capture
  */
 - (void)stopCapture;
-
-/*
- * Stop push
- */
-- (void)stopPush;
 
 /*
  * Update resolution
@@ -150,7 +173,7 @@ typedef NS_ENUM(NSInteger, LiveNetworkQualityStatus) {
  * Start PK, join RTC room
  */
 - (void)joinRTCRoomByToken:(NSString *)token
-                    roomID:(NSString *)roomID
+                 rtcRoomID:(NSString *)rtcRoomID
                     userID:(NSString *)userID;
 
 /*
@@ -162,26 +185,6 @@ typedef NS_ENUM(NSInteger, LiveNetworkQualityStatus) {
  * Turn off all far-end audio
  */
 - (void)muteAllRemoteAudio:(BOOL)isMute;
-
-/*
- * turn on transcoding
- */
-- (void)openTranscodingByUserList:(NSArray<LiveUserModel *> *)userList
-                          pushUrl:(NSString *)pushUrl
-                      isMixServer:(BOOL)isMixServer
-                         isCoHost:(BOOL)isCoHost;
-
-/*
- * turn off transcoding
- */
-- (void)closeTranscoding;
-
-/*
- * update transcoding
- */
-- (void)updateTranscodingLayout:(NSArray<LiveUserModel *> *)userList
-                       isCoHost:(BOOL)isCoHost
-                    isMixServer:(BOOL)isMixServer;
 
 /*
  * Get rendered view

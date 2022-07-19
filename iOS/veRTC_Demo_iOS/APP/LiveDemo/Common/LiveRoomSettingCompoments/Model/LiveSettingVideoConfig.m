@@ -26,7 +26,6 @@
 
 - (instancetype)init {
     if (self = [super init]) {
-        self.allowMixOnClientAndCloud = YES;
         self.fpsType = LiveSettingVideoFpsType_15;
         self.resolutionType = LiveSettingVideoResolutionType_720P;
         self.bitrate = 1600;

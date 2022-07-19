@@ -36,18 +36,9 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark -setAppInfo
 /*
  * setAppInfo
- * @param appId appId
- * @param appKey appKey
- * @param volcAk volc_ak
- * @param volc_sk volc_sk
- * @param block Callback
+ * @param dic Dic data
  */
-+ (void)setAppInfoWithAppId:(NSString *)appId
-                     appKey:(NSString *)appKey
-                     volcAk:(NSString *)volcAk
-                     volcSk:(NSString *)volcSk
-              volcAccountID:(NSString *)volcAccountID
-                   vodSpace:(NSString *)vodSpace
++ (void)setAppInfoWithAppId:(NSDictionary *)dic
                       block:(void (^ __nullable)(NetworkingResponse *response))block;
 
 #pragma mark - RTM

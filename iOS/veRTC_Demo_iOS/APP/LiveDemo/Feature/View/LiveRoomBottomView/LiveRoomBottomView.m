@@ -63,12 +63,14 @@
     NSMutableArray *list = [[NSMutableArray alloc] init];
     switch (status) {
         case BottomRoleStatusAudience:
+            [list addObject:@(LiveRoomItemButtonStateGift)];
             [list addObject:@(LiveRoomItemButtonStateChat)];
             [list addObject:@(LiveRoomItemButtonStateSet)];
             [list addObject:@(LiveRoomItemButtonStateEnd)];
             break;
 
         case BottomRoleStatusGuests:
+            [list addObject:@(LiveRoomItemButtonStateGift)];
             [list addObject:@(LiveRoomItemButtonStateBeauty)];
             [list addObject:@(LiveRoomItemButtonStateChat)];
             [list addObject:@(LiveRoomItemButtonStateSet)];

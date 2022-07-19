@@ -45,6 +45,8 @@
         imageName = @"InteractiveLive_set";
     } else if (LiveRoomItemButtonStateEnd == state) {
         imageName = @"InteractiveLive_end";
+    } else if (LiveRoomItemButtonStateGift == state) {
+        imageName = @"InteractiveLive_gift";
     }
     if (NOEmptyStr(imageName)) {
         [self setImage:[UIImage imageNamed:imageName bundleName:HomeBundleName] forState:UIControlStateNormal];

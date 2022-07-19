@@ -22,7 +22,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 @property (nonatomic, weak) LiveAddGuestsApplyView *applyView;
 @property (nonatomic, strong) UIButton *maskButton;
 @property (nonatomic, copy) void (^dismissBlock)(LiveAddGuestsDismissState state);
-@property (nonatomic, copy) NSString *roomID;
+@property (nonatomic, copy) LiveRoomInfoModel *roomInfoModel;
 @property (nonatomic, weak) LiveAddGuestsRoomView *liveAddGuestsRoomView;
 @property (nonatomic, copy) NSString *hostUid;
 @property (nonatomic, copy) NSArray<LiveUserModel *> *userList;
@@ -34,10 +34,10 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 
 @implementation LiveAddGuestsCompoments
 
-- (instancetype)initWithRoomID:(NSString *)roomID {
+- (instancetype)initWithRoomID:(LiveRoomInfoModel *)roomInfoModel {
     self = [super init];
     if (self) {
-        _roomID = roomID;
+        _roomInfoModel = roomInfoModel;
     }
     return self;
 }
@@ -116,11 +116,11 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 
 #pragma mark - Publish Live Room Action
 
-- (void)readyJoinRTCRoomByToken:(NSString *)token
-                         roomID:(NSString *)roomID
-                         userID:(NSString *)userID {
+- (void)joinRTCRoomByToken:(NSString *)token
+                 rtcRoomID:(NSString *)rtcRoomID
+                    userID:(NSString *)userID {
     [[LiveRTCManager shareRtc] joinRTCRoomByToken:token
-                                           roomID:roomID
+                                        rtcRoomID:rtcRoomID
                                            userID:userID];
 }
 
@@ -136,29 +136,26 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
     _hostUid = hostUid;
     _userList = userList;
     
-    // Start Capture
-    [[LiveRTCManager shareRtc] startCapture];
     [[LiveRTCManager shareRtc] muteAllRemoteAudio:NO];
     
     if ([hostUid isEqualToString:[LocalUserComponents userModel].uid]) {
-        // Open Trans Coding
-        BOOL isMixServer = ![LiveSettingVideoConfig defultVideoConfig].allowMixOnClientAndCloud;
-        if (!isMixServer) {
-            // 客户端合流 恢复推流
-            [[LiveRTCManager shareRtc] startPush:nil];
-        }
-        [[LiveRTCManager shareRtc] openTranscodingByUserList:userList
-                                                     pushUrl:streamPushUrl
-                                                 isMixServer:isMixServer
-                                                    isCoHost:NO];
+        // Update confluence retweet
+        __weak __typeof(self) wself = self;
+        [LiveRTCManager shareRtc].onUserPublishStreamBlock = ^(NSString * _Nonnull uid) {
+            [[LiveRTCManager shareRtc] updateTranscodingLayout:userList
+                                                     mixStatus:RTCMixStatusAddGuests
+                                                     rtcRoomId:wself.roomInfoModel.rtcRoomId];
+        };
     } else {
+        // Start Capture
+        [[LiveRTCManager shareRtc] startCapture];
         // Update the guest's own resolution
         [self loadDataWithupdateRes:YES];
     }
     
     // Update UI
     if (!_liveAddGuestsRoomView) {
-        LiveAddGuestsRoomView *liveAddGuestsRoomView = [[LiveAddGuestsRoomView alloc] initWithHostID:hostUid];
+        LiveAddGuestsRoomView *liveAddGuestsRoomView = [[LiveAddGuestsRoomView alloc] initWithHostID:hostUid roomInfoModel:self.roomInfoModel];
         [superView addSubview:liveAddGuestsRoomView];
         [liveAddGuestsRoomView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(superView);
@@ -176,7 +173,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
         }
     };
     
-    // enable network monitoring
+    // Enable network monitoring
     [[LiveRTCManager shareRtc] didChangeNetworkQuality:^(LiveNetworkQualityStatus status, NSString *_Nonnull uid) {
         dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
             [wself.liveAddGuestsRoomView updateNetworkQuality:status uid:uid];
@@ -204,8 +201,15 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
     _isConnect = NO;
     
     if ([_hostUid isEqualToString:[LocalUserComponents userModel].uid]) {
-        // anchor
-        [[LiveRTCManager shareRtc] closeTranscoding];
+        [[LiveRTCManager shareRtc] stopForwardStreamToRooms];
+        LiveUserModel *ownerUserModel = [[LiveUserModel alloc] init];
+        ownerUserModel.uid = [LocalUserComponents userModel].uid;
+        
+        [[LiveRTCManager shareRtc] updateTranscodingLayout:@[ownerUserModel]
+                                                 mixStatus:RTCMixStatusSingleLive
+                                                 rtcRoomId:self.roomInfoModel.rtcRoomId];
+        
+        [LiveRTCManager shareRtc].onUserPublishStreamBlock = nil;
     } else {
         // audience
         [[LiveRTCManager shareRtc] stopCapture];
@@ -228,11 +232,15 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 }
 
 - (void)updateGuestsMic:(BOOL)mic uid:(NSString *)uid {
-    [self.liveAddGuestsRoomView updateGuestsMic:mic uid:uid];
+    if (_liveAddGuestsRoomView) {
+        [_liveAddGuestsRoomView updateGuestsMic:mic uid:uid];
+    }
 }
 
 - (void)updateGuestsCamera:(BOOL)camera uid:(NSString *)uid {
-    [self.liveAddGuestsRoomView updateGuestsCamera:camera uid:uid];
+    if (_liveAddGuestsRoomView) {
+        [_liveAddGuestsRoomView updateGuestsCamera:camera uid:uid];
+    }
 }
 
 - (void)closeSheet:(NSString *)uid {
@@ -303,7 +311,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 - (void)clickApplyAction:(NSString *)hostID {
     __weak __typeof(self) wself = self;
     // 观众申请上麦
-    [LiveRTMManager liveAudienceLinkmicApply:self.roomID
+    [LiveRTMManager liveAudienceLinkmicApply:self.roomInfoModel.roomID
                                               block:^(NSString *linkerID,
                                                       RTMACKModel *model) {
         if (model.result || model.code == RTMStatusCodeUserIsInviting) {
@@ -359,7 +367,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 - (void)loadDataWithUpdateMediaStatus:(LiveUserModel *)userModel
                                   mic:(NSInteger)mic
                                camera:(NSInteger)camera {
-    [LiveRTMManager liveManageGuestMedia:self.roomID
+    [LiveRTMManager liveManageGuestMedia:self.roomInfoModel.roomID
                                     guestRoomID:userModel.roomID
                                     guestUserID:userModel.uid
                                             mic:mic
@@ -373,7 +381,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 
 - (void)loadDataWithAudienceLinkmicKick:(LiveUserModel *)userModel {
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveAudienceLinkmicKick:self.roomID
+    [LiveRTMManager liveAudienceLinkmicKick:self.roomInfoModel.roomID
                                     audienceRoomID:userModel.roomID
                                     audienceUserID:userModel.uid
                                              block:^(RTMACKModel * _Nonnull model) {
@@ -389,7 +397,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 
 - (void)loadDataWithGetAudienceList {
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveGetAudienceList:self.roomID
+    [LiveRTMManager liveGetAudienceList:self.roomInfoModel.roomID
                                          block:^(NSArray<LiveUserModel *> *userList,
                                                  RTMACKModel *_Nonnull model) {
         if (model.result) {
@@ -401,7 +409,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
 - (void)loadDataWithupdateRes:(BOOL)isOnMic {
     CGSize videoSize = isOnMic ? [LiveSettingVideoConfig defultVideoConfig].guestVideoSize : CGSizeZero;
     [LiveRTMManager liveUpdateResWithSize:videoSize
-                                          roomID:self.roomID
+                                          roomID:self.roomInfoModel.roomID
                                            block:^(RTMACKModel * _Nonnull model) {
         if (model.result) {
             [[LiveRTCManager shareRtc] updateRes:videoSize];
@@ -415,7 +423,7 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
                    clickButton:(LiveUserModel *)model {
     // 主播邀请观众
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveAudienceLinkmicInvite:self.roomID
+    [LiveRTMManager liveAudienceLinkmicInvite:self.roomInfoModel.roomID
                                       audienceRoomID:model.roomID
                                       audienceUserID:model.uid
                                                extra:@""
@@ -448,6 +456,17 @@ NSTimeInterval const LiveApplyOvertimeInterval = 4.0;
     if (self.dismissBlock) {
         self.dismissBlock(state);
     }
+}
+
+- (LiveUserModel *)getOwnerUserModel:(NSArray<LiveUserModel *> *)userModelList {
+    LiveUserModel *model = nil;
+    for (LiveUserModel *tempUserModel in userModelList) {
+        if ([tempUserModel.uid isEqualToString:[LocalUserComponents userModel].uid]) {
+            model = tempUserModel;
+            break;
+        }
+    }
+    return model;
 }
 
 #pragma mark - Getter

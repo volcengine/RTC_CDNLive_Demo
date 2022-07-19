@@ -166,6 +166,10 @@ typedef NS_ENUM(NSInteger, LiveInviteReply) {
             block:(void (^ __nullable)(LiveReconnectModel * _Nullable reconnectModel,
                                        RTMACKModel *model))block;
 
+// Send IM message
++ (void)sendIMMessage:(NSString *)message
+            block:(void (^ __nullable)(RTMACKModel *model))block;
+
 #pragma mark - Global Notification message
 
 // Audience join room
@@ -205,6 +209,10 @@ typedef NS_ENUM(NSInteger, LiveInviteReply) {
                                          NSString *operatorUid,
                                          NSInteger camera,
                                          NSInteger mic))block;
+
+// Message send
++ (void)onMessageSendWithBlock:(void (^)(LiveUserModel *userModel,
+                                         NSString *message))block;
 
 #pragma mark - Single Point Notification message
 

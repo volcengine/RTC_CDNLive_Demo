@@ -40,44 +40,68 @@ typedef void (^RTCRoomMessageBlock)(RTMNoticeModel *noticeModel);
 
 @property (nonatomic, weak, nullable) id<RTCNetworkProtocol> networkDelegate;
 
-// 开启连接
+/// 业务标识参数
+@property (nonatomic, copy, readonly) NSString *businessId;
+
+
+/// 开启连接
+/// @param scenes 场景标记
+/// @param loginToken 用户登录token
+/// @param block Callback
 - (void)connect:(NSString *)scenes
      loginToken:(NSString *)loginToken
           block:(void (^)(BOOL result))block;
 
-// 开启连接
+
+/// 开启连接
+/// @param scenes 场景标记
+/// @param loginToken 用户登录token
+/// @param contentPartner 合作方标识，对应控制台创建应用后生成的 “渠道号“，一起看场景使用
+/// @param contentCategory 频道category，一起看场景使用
+/// @param block Callback
+- (void)connect:(NSString *)scenes
+     loginToken:(NSString *)loginToken
+ contentPartner:(NSString *)contentPartner
+contentCategory:(NSString *)contentCategory
+          block:(void (^)(BOOL result))block;
+
+
+/// 开启连接
+/// @param scenes 场景标记
+/// @param loginToken 用户登录token
+/// @param volcAccountID 火山控制台账户id，录制功能使用
+/// @param vodSpace 点播空间名，录制功能使用
+/// @param block Callback
 - (void)connect:(NSString *)scenes
      loginToken:(NSString *)loginToken
   volcAccountID:(NSString *)volcAccountID
        vodSpace:(NSString *)vodSpace
           block:(void (^)(BOOL result))block;
 
-// 关闭连接
+/// 关闭连接
 - (void)disconnect;
 
-// 接口请求
+/// 接口请求
 - (void)emitWithAck:(NSString *)event
                with:(NSDictionary *)item
               block:(__nullable RTCSendServerMessageBlock)block;
            
-// 注册广播监听
+/// 注册广播监听
 - (void)onSceneListener:(NSString *)key
                   block:(RTCRoomMessageBlock)block;
 
-// 移除广播监听
+/// 移除广播监听
 - (void)offSceneListener;
 
-// 多房间
-// 用于需要额外房间需求时使用
+/// 多房间,用于需要额外房间需求时使用
 - (void)joinMultiRoomByToken:(NSString *)token
                     roomID:(NSString *)roomID
                     userID:(NSString *)userID;
 
+/// 多房间,离开房间
 - (void)leaveMultiRoom;
 
-/*
- * gGet Sdk Version
- */
+/// Get Sdk Version
 + (NSString *_Nullable)getSdkVersion;
 
 #pragma mark - config

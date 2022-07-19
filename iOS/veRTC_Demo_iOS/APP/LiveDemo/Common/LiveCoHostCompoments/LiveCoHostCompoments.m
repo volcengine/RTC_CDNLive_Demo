@@ -19,16 +19,17 @@
 @property (nonatomic, weak) LiveCoHostAudienceListsView *audienceListsView;
 @property (nonatomic, strong) UIButton *maskButton;
 @property (nonatomic, copy) void (^dismissBlock)(LiveCoHostDismissState state);
-@property (nonatomic, weak) LiveCoHostRoomView *liveCoHostRoomView;
-@property (nonatomic, copy) NSString *roomID;
+@property (nonatomic, strong) LiveCoHostRoomView *liveCoHostRoomView;
+@property (nonatomic, copy) LiveRoomInfoModel *roomInfoModel;
+@property (nonatomic, copy) NSArray<LiveUserModel *> *userModelList;
 @end
 
 @implementation LiveCoHostCompoments
 
-- (instancetype)initWithRoomID:(NSString *)roomID {
+- (instancetype)initWithRoomID:(LiveRoomInfoModel *)roomInfoModel {
     self = [super init];
     if (self) {
-        _roomID = roomID;
+        _roomInfoModel = roomInfoModel;
     }
     return self;
 }
@@ -100,54 +101,48 @@
 
 #pragma mark - Publish Room Action
 
-- (void)readyJoinRTCRoomByToken:(NSString *)token
-                         roomID:(NSString *)roomID
-                         userID:(NSString *)userID {
-    [[LiveRTCManager shareRtc] joinRTCRoomByToken:token
-                                           roomID:roomID
-                                           userID:userID];
-}
-
-- (void)leaveRTCRoom {
-    [[LiveRTCManager shareRtc] leaveRTCRoom];
-}
-
 - (void)showCoHost:(UIView *)superView
      streamPushUrl:(NSString *)streamPushUrl
      userModelList:(NSArray<LiveUserModel *> *)userModelList
-    loginUserModel:(LiveUserModel *)loginUserModel {
+    loginUserModel:(LiveUserModel *)loginUserModel
+ otherAnchorRoomId:(NSString *)otherRoomId
+  otherAnchorToken:(NSString *)otherToken {
     _isConnect = YES;
+    _userModelList = userModelList;
     
     [[LiveRTCManager shareRtc] muteAllRemoteAudio:NO];
-    // Start Capture
-    [[LiveRTCManager shareRtc] startCapture];
-    // Open Trans Coding
-    [[LiveRTCManager shareRtc] startPush:nil];
-    BOOL isMixServer = ![LiveSettingVideoConfig defultVideoConfig].allowMixOnClientAndCloud;
-    [[LiveRTCManager shareRtc] openTranscodingByUserList:userModelList
-                                                 pushUrl:streamPushUrl
-                                             isMixServer:isMixServer
-                                                isCoHost:YES];
-    
-    if (!_liveCoHostRoomView) {
-        LiveCoHostRoomView *liveCoHostRoomView = [[LiveCoHostRoomView alloc] init];
-        [superView addSubview:liveCoHostRoomView];
-        CGFloat coHostWidth = SCREEN_WIDTH;
-        CGFloat coHostHeight = ceilf((SCREEN_WIDTH / 2) * 16 / 9);
-        [liveCoHostRoomView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.size.mas_equalTo(CGSizeMake(coHostWidth, coHostHeight));
-            make.center.equalTo(superView);
-        }];
-        _liveCoHostRoomView = liveCoHostRoomView;
-    }
-    _liveCoHostRoomView.userModelList = userModelList;
-    [_liveCoHostRoomView updateGuestsMic:loginUserModel.mic
-                                     uid:loginUserModel.uid];
-    [_liveCoHostRoomView updateGuestsCamera:loginUserModel.camera
-                                        uid:loginUserModel.uid];
-    
-    // enable network monitoring
+    // Enable span the room retweet stream
+    [[LiveRTCManager shareRtc] startForwardStreamToRooms:otherRoomId
+                                                   token:otherToken];
+    // Receive the audio and video stream retweeted across the room by the host of the other party
     __weak __typeof(self) wself = self;
+    [LiveRTCManager shareRtc].onUserPublishStreamBlock = ^(NSString * _Nonnull uid) {
+        LiveUserModel *otherUserModel = [wself getOtherUserModel:userModelList];
+        if ([uid isEqualToString:otherUserModel.uid]) {
+            // Update confluence retweet
+            [[LiveRTCManager shareRtc] updateTranscodingLayout:userModelList
+                                                     mixStatus:RTCMixStatusCoHost
+                                                     rtcRoomId:wself.roomInfoModel.rtcRoomId];
+            
+            // Update local UI layout
+            wself.liveCoHostRoomView.userModelList = userModelList;
+        }
+    };
+    
+    // UI
+    [superView addSubview:self.liveCoHostRoomView];
+    CGFloat coHostWidth = SCREEN_WIDTH;
+    CGFloat coHostHeight = ceilf((SCREEN_WIDTH / 2) * 16 / 9);
+    [self.liveCoHostRoomView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.size.mas_equalTo(CGSizeMake(coHostWidth, coHostHeight));
+        make.center.equalTo(superView);
+    }];
+    [self.liveCoHostRoomView updateGuestsMic:loginUserModel.mic
+                                         uid:loginUserModel.uid];
+    [self.liveCoHostRoomView updateGuestsCamera:loginUserModel.camera
+                                            uid:loginUserModel.uid];
+    
+    // Enable network monitoring
     [[LiveRTCManager shareRtc] didChangeNetworkQuality:^(LiveNetworkQualityStatus status, NSString *_Nonnull uid) {
         dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
             [wself.liveCoHostRoomView updateNetworkQuality:status uid:uid];
@@ -158,12 +153,20 @@
 - (void)closeCoHost {
     _isConnect = NO;
     
-    [[LiveRTCManager shareRtc] closeTranscoding];
+    // Stop span the room retweet stream
+    [[LiveRTCManager shareRtc] stopForwardStreamToRooms];
+    // Update confluence retweet
+    LiveUserModel *ownerUserModel = [[LiveUserModel alloc] init];
+    ownerUserModel.uid = [LocalUserComponents userModel].uid;
     
-    if (_liveCoHostRoomView) {
-        [_liveCoHostRoomView removeAllSubviews];
-        [_liveCoHostRoomView removeFromSuperview];
-        _liveCoHostRoomView = nil;
+    [[LiveRTCManager shareRtc] updateTranscodingLayout:@[ownerUserModel]
+                                             mixStatus:RTCMixStatusSingleLive
+                                             rtcRoomId:self.roomInfoModel.rtcRoomId];
+    [LiveRTCManager shareRtc].onUserPublishStreamBlock = nil;
+    
+    if (self.liveCoHostRoomView) {
+        [self.liveCoHostRoomView removeFromSuperview];
+        self.liveCoHostRoomView = nil;
     }
 }
 
@@ -179,7 +182,7 @@
 
 - (void)loadDataWithRaiseHandLists {
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveGetActiveAnchorList:self.roomID
+    [LiveRTMManager liveGetActiveAnchorList:self.roomInfoModel.roomID
                                              block:^(NSArray<LiveUserModel *> * _Nullable userList, RTMACKModel * _Nonnull model) {
         if (model.result) {
             wself.raiseHandListsView.dataLists = userList;
@@ -209,7 +212,7 @@
 
 - (void)liveCoHostRaiseHandListsView:(LiveCoHostRaiseHandListsView *)liveCoHostRaiseHandListsView clickButton:(LiveUserModel *)userModel {
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveAnchorLinkmicInvite:self.roomID
+    [LiveRTMManager liveAnchorLinkmicInvite:self.roomInfoModel.roomID
                                      inviteeRoomID:userModel.roomID
                                      inviteeUserID:userModel.uid
                                              extra:@""
@@ -247,7 +250,36 @@
     }
 }
 
+- (LiveUserModel *)getOtherUserModel:(NSArray<LiveUserModel *> *)userModelList {
+    LiveUserModel *otherModel = nil;
+    for (LiveUserModel *tempUserModel in userModelList) {
+        if (![tempUserModel.uid isEqualToString:[LocalUserComponents userModel].uid]) {
+            otherModel = tempUserModel;
+            break;
+        }
+    }
+    return otherModel;
+}
+
+- (LiveUserModel *)getOwnerUserModel:(NSArray<LiveUserModel *> *)userModelList {
+    LiveUserModel *model = nil;
+    for (LiveUserModel *tempUserModel in userModelList) {
+        if ([tempUserModel.uid isEqualToString:[LocalUserComponents userModel].uid]) {
+            model = tempUserModel;
+            break;
+        }
+    }
+    return model;
+}
+
 #pragma mark - Getter
+
+- (LiveCoHostRoomView *)liveCoHostRoomView {
+    if (!_liveCoHostRoomView) {
+        _liveCoHostRoomView = [[LiveCoHostRoomView alloc] init];
+    }
+    return _liveCoHostRoomView;
+}
 
 - (UIButton *)maskButton {
     if (!_maskButton) {

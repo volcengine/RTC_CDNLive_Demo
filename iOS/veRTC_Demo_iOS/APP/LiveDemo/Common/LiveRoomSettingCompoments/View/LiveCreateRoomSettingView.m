@@ -13,9 +13,6 @@
 @interface LiveCreateRoomSettingView ()
 @property (nonatomic, strong) UILabel *titleLabel;
 
-@property (nonatomic, strong) UILabel *mixStreamLabel;
-@property (nonatomic, strong) UISwitch *mixStreamSwitch;
-
 @property (nonatomic, strong) LiveSettingSingleSelectView *fpsSelectView;
 @property (nonatomic, strong) LiveSettingSingleSelectView *resolutoinSelectView;
 @property (nonatomic, strong) LiveSettingBitrateView *bitrateSelectView;
@@ -34,22 +31,10 @@
           make.top.mas_equalTo(16);
         }];
 
-        [self addSubview:self.mixStreamLabel];
-        [self.mixStreamLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-          make.top.mas_equalTo(76);
-          make.left.mas_equalTo(16);
-        }];
-
-        [self addSubview:self.mixStreamSwitch];
-        [self.mixStreamSwitch mas_makeConstraints:^(MASConstraintMaker *make) {
-          make.centerY.equalTo(self.mixStreamLabel);
-          make.right.mas_equalTo(-16);
-        }];
-
         [self addSubview:self.fpsSelectView];
         [self.fpsSelectView mas_makeConstraints:^(MASConstraintMaker *make) {
           make.left.right.equalTo(self);
-          make.top.equalTo(self.mixStreamLabel.mas_bottom).offset(24);
+          make.top.equalTo(self.titleLabel.mas_bottom).offset(24);
           make.height.mas_equalTo(60);
         }];
 
@@ -87,20 +72,13 @@
 
 - (void)setVideoConfig:(LiveSettingVideoConfig *)videoConfig {
     _videoConfig = videoConfig;
-    self.mixStreamSwitch.on = videoConfig.allowMixOnClientAndCloud;
+    
     [self.fpsSelectView setSelectedIndex:videoConfig.fpsType];
     [self.resolutoinSelectView setSelectedIndex:videoConfig.resolutionType];
 
     self.bitrateSelectView.maxBitrate = videoConfig.maxBitrate;
     self.bitrateSelectView.minBitrate = videoConfig.minBitrate;
     self.bitrateSelectView.bitrate = videoConfig.bitrate;
-}
-
-- (void)mixStreamSwitchValueChanged:(UISwitch *)sender {
-    self.videoConfig.allowMixOnClientAndCloud = sender.isOn;
-    if ([self.delegate respondsToSelector:@selector(liveCreateRoomSettingView:didChangeMixStreamState:)]) {
-        [self.delegate liveCreateRoomSettingView:self didChangeMixStreamState:sender.isOn];
-    }
 }
 
 - (void)fpsDidChanged:(NSInteger)index {
@@ -142,26 +120,6 @@
         _titleLabel.textColor = [UIColor colorFromHexString:@"#E5E6EB"];
     }
     return _titleLabel;
-}
-
-- (UILabel *)mixStreamLabel {
-    if (!_mixStreamLabel) {
-        _mixStreamLabel = [[UILabel alloc] init];
-        _mixStreamLabel = [[UILabel alloc] init];
-        _mixStreamLabel.textColor = [UIColor colorFromHexString:@"#E5E6EB"];
-        _mixStreamLabel.font = [UIFont systemFontOfSize:16];
-        _mixStreamLabel.text = @"端云一体合流";
-    }
-    return _mixStreamLabel;
-}
-
-- (UISwitch *)mixStreamSwitch {
-    if (!_mixStreamSwitch) {
-        _mixStreamSwitch = [[UISwitch alloc] init];
-        _mixStreamSwitch.onTintColor = [UIColor colorFromHexString:@"#165DFF"];
-        [_mixStreamSwitch addTarget:self action:@selector(mixStreamSwitchValueChanged:) forControlEvents:UIControlEventValueChanged];
-    }
-    return _mixStreamSwitch;
 }
 
 - (LiveSettingSingleSelectView *)fpsSelectView {

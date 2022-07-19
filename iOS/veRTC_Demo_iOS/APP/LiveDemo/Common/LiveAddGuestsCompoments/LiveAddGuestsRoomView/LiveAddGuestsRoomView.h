@@ -18,7 +18,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) NSArray *guestList;
 
-- (instancetype)initWithHostID:(NSString *)hostID;
+- (instancetype)initWithHostID:(NSString *)hostID
+                 roomInfoModel:(LiveRoomInfoModel *)roomInfoModel;
 
 - (void)updateGuests:(NSArray<LiveUserModel *> *)userList;
 

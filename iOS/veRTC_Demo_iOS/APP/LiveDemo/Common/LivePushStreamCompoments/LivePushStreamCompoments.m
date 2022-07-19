@@ -32,9 +32,8 @@
 - (void)openWithUserModel:(LiveUserModel *)userModel {
     _isConnect = YES;
 
-    // 开启采集&推流
+    // 开启采集
     [[LiveRTCManager shareRtc] startCapture];
-    [[LiveRTCManager shareRtc] startPush:nil];
     [[LiveRTCManager shareRtc] bingCanvasViewToUid:userModel.uid];
 
     if (!_renderView) {
@@ -53,17 +52,17 @@
     rtcStreamView.hidden = NO;
     [_renderView.streamView addSubview:rtcStreamView];
     [rtcStreamView mas_remakeConstraints:^(MASConstraintMaker *make) {
-      make.edges.equalTo(_renderView.streamView);
+        make.edges.equalTo(_renderView.streamView);
     }];
 
     // 开启网络监听
     __weak __typeof(self) wself = self;
     [[LiveRTCManager shareRtc] didChangeNetworkQuality:^(LiveNetworkQualityStatus status, NSString *_Nonnull uid) {
       dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
-                                  if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
-                                      [wself.renderView updateNetworkQuality:status];
-                                  }
-                                }));
+          if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
+              [wself.renderView updateNetworkQuality:status];
+          }
+      }));
     }];
 }
 

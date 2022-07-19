@@ -21,12 +21,13 @@
 @property (nonatomic, strong) BytedEffectProtocol *beautyCompoments;
 
 - (instancetype)initWithRoomModel:(LiveRoomInfoModel *)liveRoomModel
-                   reconnectModel:(LiveReconnectModel *)reconnectModel
                     streamPushUrl:(NSString *)streamPushUrl;
 
 - (void)addUser:(LiveUserModel *)userModel audienceCount:(NSInteger)audienceCount;
 
 - (void)removeUser:(LiveUserModel *)userModel audienceCount:(NSInteger)audienceCount;
+
+- (void)receivedIMMessage:(NSString *)message sendUserModel:(LiveUserModel *)sendUserModel;
 
 // CoHost
 - (void)receivedCoHostInviteWithUser:(LiveUserModel *)inviter
@@ -36,11 +37,11 @@
 - (void)receivedCoHostRefuseWithUser:(LiveUserModel *)invitee;
 
 - (void)receivedCoHostSucceedWithUser:(LiveUserModel *)invitee
-                             linkerID:(NSString *)linkerID
-                            rtcRoomID:(NSString *)rtcRoomID
-                             rtcToken:(NSString *)rtcToken;
+                             linkerID:(NSString *)linkerID;
 
-- (void)receivedCoHostJoin:(NSArray<LiveUserModel *> *)userlList;
+- (void)receivedCoHostJoin:(NSArray<LiveUserModel *> *)userlList
+         otherAnchorRoomId:(NSString *)otherRoomId
+          otherAnchorToken:(NSString *)otherToken;
 
 - (void)receivedCoHostEnd;
 

@@ -30,6 +30,8 @@
         if ([LiveRTMManager ackModelResponseClass:ackModel]) {
             roomModel = [LiveRoomInfoModel yy_modelWithJSON:ackModel.response[@"live_room_info"]];
             roomModel.rtmToken = [NSString stringWithFormat:@"%@", ackModel.response[@"rtm_token"]];
+            roomModel.rtcToken = [NSString stringWithFormat:@"%@", ackModel.response[@"rtc_token"]];
+            roomModel.rtcRoomId = [NSString stringWithFormat:@"%@", ackModel.response[@"rtc_room_id"]];
             hostUserModel = [LiveUserModel yy_modelWithJSON:ackModel.response[@"user_info"]];
             pushUrl = [NSString stringWithFormat:@"%@", ackModel.response[@"stream_push_url"]];
         }
@@ -618,6 +620,26 @@
     }];
 }
 
++ (void)sendIMMessage:(NSString *)message
+                block:(void (^ __nullable)(RTMACKModel *model))block {
+    NSDictionary *dic = @{};
+    if (NOEmptyStr(message)) {
+        dic = @{
+            @"message" : message,
+        };
+    }
+    dic = [PublicParameterCompoments addTokenToParams:dic];
+    
+    [[LiveRTCManager shareRtc] emitWithAck:@"liveSendMessage"
+                                      with:dic
+                                     block:^(RTMACKModel * _Nonnull ackModel) {
+        if (block) {
+            block(ackModel);
+        }
+        NSLog(@"[%@]-liveReconnect %@|%@", [self class], dic, ackModel.response);
+    }];
+}
+
 #pragma mark - Reconnect
 
 + (void)reconnect:(NSString *)roomID
@@ -840,6 +862,25 @@
             block(rtcRoomID, uid, operatorUid, camera, mic);
         }
         NSLog(@"[%@]-onMediaChange \n %@", [self class], noticeModel.data);
+    }];
+}
+
++ (void)onMessageSendWithBlock:(void (^)(LiveUserModel *userModel,
+                                         NSString *message))block {
+    [[LiveRTCManager shareRtc] onSceneListener:@"liveOnMessageSend"
+                                         block:^(RTMNoticeModel * _Nonnull
+                                                      noticeModel) {
+        
+        NSString *message = @"";
+        LiveUserModel *userModel = nil;
+        if (noticeModel.data && [noticeModel.data isKindOfClass:[NSDictionary class]]) {
+            userModel = [LiveUserModel yy_modelWithJSON:noticeModel.data[@"user"]];
+            message = [NSString stringWithFormat:@"%@", noticeModel.data[@"message"]];
+        }
+        if (block) {
+            block(userModel, message);
+        }
+        NSLog(@"[%@]-liveOnMessageSend \n %@", [self class], noticeModel.data);
     }];
 }
 

@@ -88,26 +88,12 @@
     }];
 }
 
-- (void)reconnect:(LiveReconnectModel *)reconnectModel {
-    [PublicParameterCompoments share].roomId = reconnectModel.roomModel.roomID;
-    LiveRoomViewController *next = [[LiveRoomViewController alloc]
-                                    initWithRoomModel:reconnectModel.roomModel
-                                    reconnectModel:reconnectModel
-                                    streamPushUrl:reconnectModel.streamPushUrl];
-    [self.navigationController pushViewController:next animated:YES];
-    __weak __typeof(self) wself = self;
-    next.hangUpBlock = ^(BOOL result) {
-        [wself loadDataWithGetLists];
-    };
-}
-
 #pragma mark - LiveRoomTableViewDelegate
 
 - (void)LiveRoomTableView:(LiveRoomTableView *)LiveRoomTableView didSelectRowAtIndexPath:(LiveRoomInfoModel *)model {
     [PublicParameterCompoments share].roomId = model.roomID;
     LiveRoomViewController *next = [[LiveRoomViewController alloc]
                                     initWithRoomModel:model
-                                    reconnectModel:nil
                                     streamPushUrl:@""];
     [self.navigationController pushViewController:next animated:YES];
     __weak __typeof(self) wself = self;

@@ -21,7 +21,7 @@ typedef NS_ENUM(NSInteger, LiveCoHostDismissState) {
 
 @property (nonatomic, assign, readonly) BOOL isConnect;
 
-- (instancetype)initWithRoomID:(NSString *)roomID;
+- (instancetype)initWithRoomID:(LiveRoomInfoModel *)roomInfoModel;
 
 // list
 
@@ -31,16 +31,12 @@ typedef NS_ENUM(NSInteger, LiveCoHostDismissState) {
 
 // live room
 
-- (void)readyJoinRTCRoomByToken:(NSString *)token
-                         roomID:(NSString *)roomID
-                         userID:(NSString *)userID;
-
-- (void)leaveRTCRoom;
-
 - (void)showCoHost:(UIView *)superView
      streamPushUrl:(NSString *)streamPushUrl
      userModelList:(NSArray<LiveUserModel *> *)userModelList
-    loginUserModel:(LiveUserModel *)loginUserModel;
+    loginUserModel:(LiveUserModel *)loginUserModel
+ otherAnchorRoomId:(NSString *)otherRoomId
+  otherAnchorToken:(NSString *)otherToken;
 
 - (void)closeCoHost;
 

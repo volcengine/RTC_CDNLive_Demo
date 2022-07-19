@@ -121,6 +121,15 @@
     if (_dataArray == nil) {
         _dataArray = [NSMutableArray array];
         
+        NSObject *chorusDemo = [[NSClassFromString(@"ChorusDemo") alloc] init];
+        if (chorusDemo) {
+            SceneButtonModel *model = [[SceneButtonModel alloc] init];
+            model.title = @"双人合唱";
+            model.iconName = @"menu_chorus";
+            model.scenes = chorusDemo;
+            [_dataArray addObject:model];
+        }
+        
         NSObject *feedShareDemo = [[NSClassFromString(@"FeedShareDemo") alloc] init];
         if (feedShareDemo) {
             SceneButtonModel *model = [[SceneButtonModel alloc] init];

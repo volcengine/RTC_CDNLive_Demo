@@ -29,9 +29,14 @@
 
 - (void)setModel:(LiveIMModel *)model {
     _model = model;
-    NSString *unitStr = model.isJoin ? @"加入了房间" : @"退出了房间";
-    NSString *roomName = [NSString stringWithFormat:@"%@ %@", model.userModel.name, unitStr];
-    [self setLineSpace:5 withText:roomName inLabel:self.roomNameLabel];
+    
+    if (NOEmptyStr(model.message)) {
+        [self setLineSpace:5 withText:model.message inLabel:self.roomNameLabel imageName:model.imageName];
+    } else {
+        NSString *unitStr = model.isJoin ? @"加入了房间" : @"退出了房间";
+        NSString *roomName = [NSString stringWithFormat:@"%@ %@", model.userModel.name, unitStr];
+        [self setLineSpace:5 withText:roomName inLabel:self.roomNameLabel imageName:@""];
+    }
 }
 
 #pragma mark - Private Action
@@ -55,17 +60,26 @@
 
 #pragma mark - Private Action
 
-- (void)setLineSpace:(CGFloat)lineSpace withText:(NSString *)text inLabel:(UILabel *)label {
+- (void)setLineSpace:(CGFloat)lineSpace withText:(NSString *)text inLabel:(UILabel *)label imageName:(NSString *)imageName {
     if (!text || !label) {
         return;
     }
+    NSMutableAttributedString *attributedString = [[NSMutableAttributedString alloc] initWithString:text];
+    
     NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
     paragraphStyle.lineSpacing = lineSpace;
     paragraphStyle.lineBreakMode = label.lineBreakMode;
     paragraphStyle.alignment = label.textAlignment;
-
-    NSMutableAttributedString *attributedString = [[NSMutableAttributedString alloc] initWithString:text];
     [attributedString addAttribute:NSParagraphStyleAttributeName value:paragraphStyle range:NSMakeRange(0, [text length])];
+    
+    if (NOEmptyStr(imageName)) {
+        NSTextAttachment *attch = [[NSTextAttachment alloc] init];
+        attch.image = [UIImage imageNamed:imageName bundleName:HomeBundleName];
+        attch.bounds = CGRectMake(0, label.font.descender + 1.5, 16, 16);
+        NSAttributedString *imageString = [NSAttributedString attributedStringWithAttachment:attch];
+        [attributedString appendAttributedString:imageString];
+    }
+
     label.attributedText = attributedString;
 }
 

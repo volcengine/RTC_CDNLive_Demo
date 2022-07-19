@@ -19,10 +19,8 @@ Pod::Spec.new do |spec|
                                 '#import "LiveRTMManager.h"',
                                 '#import "LiveDemoConstants.h"'
     
-  spec.vendored_libraries = 'libyuv/lib/libyuv.a'
   spec.dependency 'Core'
   spec.dependency 'YYModel'
   spec.dependency 'Masonry'
   spec.dependency 'VolcEngineRTC'
-  spec.dependency 'LFLiveKit'
 end

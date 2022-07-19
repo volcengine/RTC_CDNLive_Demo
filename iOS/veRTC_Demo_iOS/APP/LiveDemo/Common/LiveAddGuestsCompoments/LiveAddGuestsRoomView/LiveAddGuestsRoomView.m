@@ -19,7 +19,7 @@
 @property (nonatomic, strong) UIView *guestsView;
 @property (nonatomic, strong) NSMutableArray<LiveAddGuestsItemView *> *itemList;
 @property (nonatomic, copy) NSArray<LiveUserModel *> *userList;
-
+@property (nonatomic, strong) LiveRoomInfoModel *roomInfoModel;
 @property (nonatomic, strong) LiveStateIconView *netQualityView;
 @property (nonatomic, strong) LiveStateIconView *micView;
 @property (nonatomic, strong) LiveStateIconView *cameraView;
@@ -30,9 +30,11 @@
 
 @implementation LiveAddGuestsRoomView
 
-- (instancetype)initWithHostID:(NSString *)hostID {
+- (instancetype)initWithHostID:(NSString *)hostID
+                 roomInfoModel:(LiveRoomInfoModel *)roomInfoModel {
     self = [super init];
     if (self) {
+        _roomInfoModel = roomInfoModel;
         _hostID = hostID;
         NSInteger maxItemNumber = 6;
         CGFloat itemHeight = SCREEN_HEIGHT * 80.0 / 667.0;
@@ -120,10 +122,9 @@
     _guestList = [self removeHostUserModel:userList];
     [self updateItemView];
     
-    BOOL isMixServer = ![LiveSettingVideoConfig defultVideoConfig].allowMixOnClientAndCloud;
     [[LiveRTCManager shareRtc] updateTranscodingLayout:userList
-                                              isCoHost:NO
-                                           isMixServer:isMixServer];
+                                             mixStatus:RTCMixStatusAddGuests
+                                             rtcRoomId:self.roomInfoModel.rtcRoomId];
 }
 
 - (void)removeGuests:(NSString *)uid {
@@ -200,10 +201,9 @@
             break;
         }
     }
-    BOOL isMixServer = ![LiveSettingVideoConfig defultVideoConfig].allowMixOnClientAndCloud;
     [[LiveRTCManager shareRtc] updateTranscodingLayout:_userList
-                                              isCoHost:NO
-                                           isMixServer:isMixServer];
+                                             mixStatus:RTCMixStatusAddGuests
+                                             rtcRoomId:self.roomInfoModel.rtcRoomId];
 }
 
 - (void)updateNetworkQuality:(LiveNetworkQualityStatus)status uid:(NSString *)uid {

@@ -22,7 +22,6 @@ typedef NS_ENUM(NSUInteger, LiveSettingVideoResolutionType) {
 };
 
 @interface LiveSettingVideoConfig : NSObject
-@property (nonatomic, assign) BOOL allowMixOnClientAndCloud;
 @property (nonatomic, assign) LiveSettingVideoFpsType fpsType;
 @property (nonatomic, assign) LiveSettingVideoResolutionType resolutionType;
 

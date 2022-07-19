@@ -54,49 +54,30 @@
 
 #pragma mark - SetAppInfo
 
-+ (void)setAppInfoWithAppId:(NSString *)appId
-                     appKey:(NSString *)appKey
-                     volcAk:(NSString *)volcAk
-                     volcSk:(NSString *)volcSk
-              volcAccountID:(NSString *)volcAccountID
-                   vodSpace:(NSString *)vodSpace
++ (void)setAppInfoWithAppId:(NSDictionary *)dic
                       block:(void (^ __nullable)(NetworkingResponse *response))block {
+    NSString *appId = [NSString stringWithFormat:@"%@", dic[@"appId"]];
+    NSString *appKey = [NSString stringWithFormat:@"%@", dic[@"appKey"]];
+    NSString *volcAk = [NSString stringWithFormat:@"%@", dic[@"volcAk"]];
+    NSString *volcSk = [NSString stringWithFormat:@"%@", dic[@"volcSk"]];
+    NSString *volcAccountID = [NSString stringWithFormat:@"%@", dic[@"volcAccountID"]];
+    NSString *vodSpace = [NSString stringWithFormat:@"%@", dic[@"vodSpace"]];
+    NSString *scenesName = [NSString stringWithFormat:@"%@", dic[@"scenesName"]];
+    NSString *loginToken = [NSString stringWithFormat:@"%@", dic[@"loginToken"]];
+    NSString *contentPartner = [NSString stringWithFormat:@"%@", dic[@"contentPartner"]];
+    NSString *contentCategory = [NSString stringWithFormat:@"%@", dic[@"contentCategory"]];
+
     NSDictionary *content = @{@"app_id" : appId ?: @"",
                               @"app_key" : appKey ?: @"",
                               @"volc_ak" : volcAk ?: @"",
                               @"volc_sk" : volcSk ?: @"",
                               @"account_id" : volcAccountID ?: @"",
-                              @"vod_space" : vodSpace ?: @""};
+                              @"vod_space" : vodSpace ?: @"",
+                              @"scenes_name" : scenesName ?: @"",
+                              @"login_token" : loginToken ?: @"",
+                              @"content_partner" : contentPartner ?: @"",
+                              @"content_category" : contentCategory ?: @""};
     [self postWithEventName:@"setAppInfo" content:content block:block];
-}
-
-#pragma mark - RTM
-
-+ (void)joinRTM:(NSString *)scenes
-     loginToken:(NSString *)loginToken
-          block:(void (^)(NSString * _Nullable,
-                          NSString * _Nullable,
-                          NSString * _Nullable,
-                          NSString * _Nullable,
-                          NetworkingResponse * _Nonnull))block {
-    NSDictionary *content = @{@"scenes_name" : scenes ?: @"",
-                              @"login_token" : loginToken ?: @""};
-    [self postWithEventName:@"joinRTM" content:content
-                      block:^(NetworkingResponse *response) {
-        NSString *appID = nil;
-        NSString *RTMToken = nil;
-        NSString *serverUrl = nil;
-        NSString *serverSig = nil;
-        if (response.result) {
-            appID = response.response[@"app_id"];
-            RTMToken = response.response[@"rtm_token"];
-            serverUrl = response.response[@"server_url"];
-            serverSig = response.response[@"server_signature"];
-        }
-        if (block) {
-            block(appID, RTMToken, serverUrl, serverSig, response);
-        }
-    }];
 }
 
 #pragma mark -

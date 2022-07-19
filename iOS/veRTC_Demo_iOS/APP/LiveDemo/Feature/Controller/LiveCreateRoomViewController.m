@@ -52,9 +52,8 @@
         if (model.result) {
             self.roomInfoModel.hostUserModel = hostUserModel;
             LiveRoomViewController *next = [[LiveRoomViewController alloc]
-                initWithRoomModel:self.roomInfoModel
-                   reconnectModel:nil
-                    streamPushUrl:wself.pushUrl];
+                                            initWithRoomModel:self.roomInfoModel
+                                            streamPushUrl:wself.pushUrl];
             next.settingCompoments = wself.settingCompoments;
             next.beautyCompoments = wself.beautyCompoments;
             [wself.navigationController pushViewController:next animated:YES];
@@ -121,7 +120,6 @@
 }
 
 - (void)setupLocalRenderView {
-    [[LiveRTCManager shareRtc] configEngineWithPushUrl:@""];
     [[LiveRTCManager shareRtc] enableLocalVideo:YES];
     [[LiveRTCManager shareRtc] enableLocalAudio:YES];
     [[LiveRTCManager shareRtc] bingCanvasViewToUid:[LocalUserComponents userModel].uid];

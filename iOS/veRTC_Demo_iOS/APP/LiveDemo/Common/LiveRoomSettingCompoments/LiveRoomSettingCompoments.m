@@ -66,7 +66,7 @@
         case LiveRoomSettingTypeCreateRoom: {
             [superView addSubview:self.createRoomSettingView];
             [self.createRoomSettingView mas_makeConstraints:^(MASConstraintMaker *make) {
-              CGFloat height = 352 + [DeviceInforTool getVirtualHomeHeight];
+              CGFloat height = 300 + [DeviceInforTool getVirtualHomeHeight];
               make.left.right.equalTo(superView);
               make.height.mas_equalTo(height);
               make.bottom.equalTo(superView).offset(height);
@@ -230,11 +230,6 @@
 - (void)liveCreateRoomSettingView:(nonnull LiveCreateRoomSettingView *)settingView didChangeBitrate:(NSInteger)bitrate {
     LiveSettingVideoConfig *videoConfig = settingView.videoConfig;
     [[LiveRTCManager shareRtc] updateKBitrate:videoConfig.bitrate min:videoConfig.minBitrate max:videoConfig.maxBitrate];
-}
-
-- (void)liveCreateRoomSettingView:(nonnull LiveCreateRoomSettingView *)settingView didChangeMixStreamState:(BOOL)mixStream {
-    LiveSettingVideoConfig *videoConfig = settingView.videoConfig;
-    videoConfig.allowMixOnClientAndCloud = mixStream;
 }
 
 - (void)liveCreateRoomSettingView:(nonnull LiveCreateRoomSettingView *)settingView didChangeResolution:(NSInteger)index {

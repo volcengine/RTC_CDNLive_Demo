@@ -77,6 +77,21 @@ typedef NS_ENUM(NSInteger, RTMStatusCode) {
     
     // Token生成错误
     RTMStatusCodeBuildTokenFaild = 702,
+    
+    // 获取appInfo错误
+    RTMStatusCodeAPPInfoFaild = 800,
+    // redis中不存在appInfo
+    RTMStatusCodeAPPInfoExistFaild = 801,
+    // 检查流量appID错误
+    RTMStatusCodeTrafficAPPIDFaild = 802,
+    // 查看流量上限
+    RTMStatusCodeTrafficFaild = 803,
+    // 点播配置错误
+    RTMStatusCodeVodFaild = 804,
+    // 一起看配置错误
+    RTMStatusCodeTWFaild = 805,
+    // bid配置错误
+    RTMStatusCodeBIDFaild = 806,
 };
 
 @interface NetworkingTool : NSObject

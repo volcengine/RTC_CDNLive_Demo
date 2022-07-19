@@ -83,6 +83,24 @@
         case RTMStatusHostInviteOtherHost:
             message = @"正在等待被邀主播的应答";
             break;
+        case RTMStatusCodeAPPInfoFaild:
+        case RTMStatusCodeAPPInfoExistFaild:
+            message = @"setAppInfo接口错误，请检查配置信息";
+            break;
+        case RTMStatusCodeTrafficAPPIDFaild:
+        case RTMStatusCodeTrafficFaild:
+            message = @"触发限流，请稍后再试";
+            break;
+        case RTMStatusCodeVodFaild:
+            message = @"点播配置错误，请检查配置信息";
+            break;
+        case RTMStatusCodeTWFaild:
+            message = @"一起看配置错误，请检查配置信息";
+            break;
+        case RTMStatusCodeBIDFaild:
+            message = @"BID配置错误，请检查配置信息";
+            break;
+            
         default:
             break;
     }

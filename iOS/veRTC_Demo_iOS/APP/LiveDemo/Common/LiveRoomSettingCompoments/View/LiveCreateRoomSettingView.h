@@ -15,8 +15,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol LiveCreateRoomSettingViewDelegate <NSObject>
 
-- (void)liveCreateRoomSettingView:(LiveCreateRoomSettingView *)settingView didChangeMixStreamState:(BOOL)mixStream;
-
 - (void)liveCreateRoomSettingView:(LiveCreateRoomSettingView *)settingView didChangefpsType:(LiveSettingVideoFpsType)fpsType;
 
 - (void)liveCreateRoomSettingView:(LiveCreateRoomSettingView *)settingView didChangeResolution:(NSInteger)index;

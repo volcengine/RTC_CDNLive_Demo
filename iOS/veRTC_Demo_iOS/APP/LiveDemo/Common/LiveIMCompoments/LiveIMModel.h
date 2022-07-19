@@ -16,6 +16,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong) BaseUserModel *userModel;
 
+@property (nonatomic, strong) NSString *message;
+
+@property (nonatomic, strong) NSString *imageName;
+
 @end
 
 NS_ASSUME_NONNULL_END

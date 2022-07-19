@@ -16,6 +16,7 @@ typedef NS_ENUM(NSInteger, LiveRoomItemButtonState) {
     LiveRoomItemButtonStateBeauty,
     LiveRoomItemButtonStateSet,
     LiveRoomItemButtonStateEnd,
+    LiveRoomItemButtonStateGift,
 };
 
 typedef NS_ENUM(NSInteger, LiveRoomItemTouchStatus) {

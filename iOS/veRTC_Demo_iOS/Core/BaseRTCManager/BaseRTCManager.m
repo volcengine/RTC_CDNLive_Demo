@@ -45,6 +45,22 @@ static RTMMessageType const RTMMessageTypeNotice = @"inform";
        loginToken:loginToken
     volcAccountID:@""
          vodSpace:@""
+   contentPartner:@""
+  contentCategory:@""
+            block:block];
+}
+
+- (void)connect:(NSString *)scenes
+     loginToken:(NSString *)loginToken
+ contentPartner:(NSString *)contentPartner
+contentCategory:(NSString *)contentCategory
+          block:(void (^)(BOOL result))block {
+    [self connect:scenes
+       loginToken:loginToken
+    volcAccountID:@""
+         vodSpace:@""
+   contentPartner:contentPartner
+  contentCategory:contentCategory
             block:block];
 }
 
@@ -53,43 +69,100 @@ static RTMMessageType const RTMMessageTypeNotice = @"inform";
   volcAccountID:(NSString *)volcAccountID
        vodSpace:(NSString *)vodSpace
           block:(void (^)(BOOL result))block {
-    if (IsEmptyStr(scenes) || IsEmptyStr(loginToken)) {
+    [self connect:scenes
+       loginToken:loginToken
+    volcAccountID:volcAccountID
+         vodSpace:vodSpace
+   contentPartner:@""
+  contentCategory:@""
+            block:block];
+}
+
+- (void)connect:(NSString *)scenes
+     loginToken:(NSString *)loginToken
+  volcAccountID:(NSString *)volcAccountID
+       vodSpace:(NSString *)vodSpace
+ contentPartner:(NSString *)contentPartner
+contentCategory:(NSString *)contentCategory
+          block:(void (^)(BOOL result))block {
+    NSString *errorMessage = @"";
+    NSMutableDictionary *dic = [[NSMutableDictionary alloc] init];
+    if (NOEmptyStr(APPID)) {
+        [dic setValue:APPID forKey:@"appId"];
+    } else {
+        errorMessage = @"APPID";
+    }
+    
+    if (NOEmptyStr(APPKey)) {
+        [dic setValue:APPKey forKey:@"appKey"];
+    } else {
+        errorMessage = @"APPKey";
+    }
+    
+    if (NOEmptyStr(AccessKeyID)) {
+        [dic setValue:AccessKeyID forKey:@"volcAk"];
+    } else {
+        errorMessage = @"AccessKeyID";
+    }
+    
+    if (NOEmptyStr(SecretAccessKey)) {
+        [dic setValue:SecretAccessKey forKey:@"volcSk"];
+    } else {
+        errorMessage = @"SecretAccessKey";
+    }
+    
+    if (NOEmptyStr(scenes)) {
+        [dic setValue:scenes forKey:@"scenesName"];
+    } else {
+        errorMessage = @"scenes";
+    }
+    
+    if (NOEmptyStr(loginToken)) {
+        [dic setValue:loginToken forKey:@"loginToken"];
+    } else {
+        errorMessage = @"loginToken";
+    }
+    if (NOEmptyStr(errorMessage)) {
+        errorMessage = [NSString stringWithFormat:@"%@ 为空请查看配置", errorMessage];
         if (block) {
             block(NO);
         }
         return;
     }
     [PublicParameterCompoments share].appId = APPID;
+    if (NOEmptyStr(volcAccountID)) {
+        [dic setValue:volcAccountID forKey:@"volcAccountID"];
+    }
+    if (NOEmptyStr(vodSpace)) {
+        [dic setValue:vodSpace forKey:@"vodSpace"];
+    }
+    if (NOEmptyStr(contentPartner)) {
+        [dic setValue:contentPartner forKey:@"contentPartner"];
+    }
+    if (NOEmptyStr(contentCategory)) {
+        [dic setValue:contentCategory forKey:@"contentCategory"];
+    }
     __weak __typeof(self) wself = self;
-    [NetworkingManager setAppInfoWithAppId:APPID
-                                    appKey:APPKey
-                                    volcAk:AccessKeyID
-                                    volcSk:SecretAccessKey
-                             volcAccountID:volcAccountID
-                                  vodSpace:vodSpace
+    [NetworkingManager setAppInfoWithAppId:dic
                                     block:^(NetworkingResponse * _Nonnull response) {
-        if (response.result) {
-            [NetworkingManager joinRTM:scenes
-                            loginToken:loginToken
-                                 block:^(NSString * _Nullable appID,
-                                         NSString * _Nullable RTMToken,
-                                         NSString * _Nullable serverUrl,
-                                         NSString * _Nullable serverSig,
-                                         NetworkingResponse * _Nonnull response) {
-                if (!response.result) {
-                    if (block) {
-                        block(NO);
-                    }
-                    return;
-                }
-                [wself rtcConnect:appID RTMToken:RTMToken serverUrl:serverUrl
-                        serverSig:serverSig block:block];
-            }];
-        } else {
+        if (!response.result) {
             if (block) {
                 block(NO);
             }
+            return;
         }
+        NSString *appID = response.response[@"app_id"];
+        NSString *RTMToken = response.response[@"rtm_token"];
+        NSString *serverUrl = response.response[@"server_url"];
+        NSString *serverSig = response.response[@"server_signature"];
+        NSString *bid = response.response[@"bid"];
+        
+        [wself rtcConnect:appID
+                 RTMToken:RTMToken
+                serverUrl:serverUrl
+                serverSig:serverSig
+                      bid:bid
+                    block:block];
     }];
 }
 
@@ -168,7 +241,7 @@ static RTMMessageType const RTMMessageTypeNotice = @"inform";
     [self.multiRoom setRtcRoomDelegate:self];
     ByteRTCUserInfo *userInfo = [[ByteRTCUserInfo alloc] init];
     userInfo.userId = userID;
-    
+
     ByteRTCMultiRoomConfig *config = [[ByteRTCMultiRoomConfig alloc] init];
     config.profile = ByteRTCRoomProfileLiveBroadcasting;
     config.isAutoSubscribeAudio = NO;
@@ -332,6 +405,7 @@ static RTMMessageType const RTMMessageTypeNotice = @"inform";
           RTMToken:(NSString *)RTMToken
          serverUrl:(NSString *)serverUrl
          serverSig:(NSString *)serverSig
+               bid:(NSString *)bid
              block:(void (^)(BOOL result))block {
     NSString *uid = [LocalUserComponents userModel].uid;
     if (IsEmptyStr(uid)) {
@@ -347,6 +421,8 @@ static RTMMessageType const RTMMessageTypeNotice = @"inform";
     self.rtcEngineKit = [[ByteRTCEngineKit alloc] initWithAppId:appID
                                                        delegate:self
                                                      parameters:@{}];
+    _businessId = bid;
+    [self.rtcEngineKit setBusinessId:bid];
     [self configeRTCEngine];
     [self.rtcEngineKit login:RTMToken uid:uid];
     __weak __typeof(self) wself = self;

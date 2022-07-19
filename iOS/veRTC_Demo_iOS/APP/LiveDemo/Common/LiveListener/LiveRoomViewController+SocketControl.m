@@ -68,6 +68,12 @@
         }
     }];
     
+    [LiveRTMManager onMessageSendWithBlock:^(LiveUserModel * _Nonnull userModel, NSString * _Nonnull message) {
+        dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
+            [wself receivedIMMessage:message sendUserModel:userModel];
+        }));
+    }];
+    
     // Single Point Notification message
     [LiveRTMManager onAudienceLinkmicInviteWithBlock:^(LiveUserModel *inviter, NSString *linkerID, NSString *extra) {
         [wself receivedAddGuestsInviteWithUser:inviter
@@ -143,10 +149,10 @@
         switch (replyType) {
             case LiveInviteReplyPermitted:
                 [wself receivedCoHostSucceedWithUser:invitee
-                                            linkerID:linkerID
-                                           rtcRoomID:rtcRoomID
-                                            rtcToken:rtcToken];
-                [wself receivedCoHostJoin:userList];
+                                            linkerID:linkerID];
+                [wself receivedCoHostJoin:userList
+                        otherAnchorRoomId:rtcRoomID
+                         otherAnchorToken:rtcToken];
                 break;
             case LiveInviteReplyForbade:
                 [wself receivedCoHostRefuseWithUser:invitee];

@@ -26,7 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) NSArray *guestList;
 
-- (instancetype)initWithRoomID:(NSString *)roomID;
+- (instancetype)initWithRoomID:(LiveRoomInfoModel *)roomInfoModel;
 
 // List
 
@@ -36,9 +36,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Live room render
 
-- (void)readyJoinRTCRoomByToken:(NSString *)token
-                         roomID:(NSString *)roomID
-                         userID:(NSString *)userID;
+- (void)joinRTCRoomByToken:(NSString *)token
+                 rtcRoomID:(NSString *)rtcRoomID
+                    userID:(NSString *)userID;
 
 - (void)leaveRTCRoom;
 

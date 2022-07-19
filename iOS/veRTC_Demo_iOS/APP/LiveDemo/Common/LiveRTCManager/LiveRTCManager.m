@@ -7,37 +7,14 @@
 //
 
 #import <VolcEngineRTC/objc/rtc/ByteRTCEngineKit.h>
-#import <LFLiveKit/LFLiveKit.h>
 #import "LiveRTCManager.h"
 #import "LiveSettingVideoConfig.h"
-#import "libyuv.h"
 #import "BytedPlayerProtocol.h"
 
-typedef NS_ENUM(NSUInteger, RTCMixType) {
-    RTCMixTypeClose = 0,
-    RTCMixTypeServer,
-    RTCMixTypeClient,
-};
-
-typedef NS_ENUM(NSUInteger, RTCMixStatus) {
-    RTCMixStatusNone = 0,
-    RTCMixStatusAddGuests,
-    RTCMixStatusCoHost,
-};
-
-@interface LiveRTCManager () <ByteRTCEngineDelegate, LiveTranscodingDelegate, ByteRTCVideoSinkDelegate, LFLiveSessionDelegate, ByteRTCAudioProcessor>
-
-//RTMP Push Engine
-@property (nonatomic, strong) LFLiveSession *livePushEngine;
+@interface LiveRTCManager () <ByteRTCEngineDelegate, LiveTranscodingDelegate, ByteRTCVideoSinkDelegate, ByteRTCAudioProcessor>
 
 //RTMP Pull Player
 @property (nonatomic, strong) BytedPlayerProtocol *player;
-
-//RTMP Push streaming settings
-@property (nonatomic, strong) LFLiveStreamInfo *pushConfig;
-
-//Mix streaming type
-@property (nonatomic, assign) RTCMixType mixType;
 
 //Mix streaming status
 @property (nonatomic, assign) RTCMixStatus mixStatus;
@@ -51,16 +28,11 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
 //Video stream and user model binding use
 @property (nonatomic, strong) NSMutableDictionary<NSString *, UIView *> *streamViewDic;
 @property (nonatomic, copy) NSString *currentPullUrl;
-@property (nonatomic, copy) NSString *rtcRoomID;
 @property (nonatomic, assign) ByteRTCCameraID cameraID;
 @property (nonatomic, assign) BOOL isVideoCaptued;
 @property (nonatomic, assign) BOOL isAudioCaptued;
-@property (nonatomic, assign) BOOL isPush;
-@property (nonatomic, assign) BOOL isPushStarted;
 @property (nonatomic, copy) void (^networkQualityBlock)(LiveNetworkQualityStatus status,
                                                         NSString *uid);
-@property (nonatomic, copy) void (^pushStateBlock)(BOOL isStarted);
-
 @end
 
 @implementation LiveRTCManager
@@ -82,37 +54,101 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
 }
 
 - (void)configeRTCEngine {
+    [super configeRTCEngine];
+    
     // Video Capture
     ByteRTCVideoCaptureConfig *captureConfig = [[ByteRTCVideoCaptureConfig alloc] init];
     captureConfig.videoSize = CGSizeMake(1280, 720);
     captureConfig.frameRate = 15;
     [self.rtcEngineKit setVideoCaptureConfig:captureConfig];
     
+    // Encoder config
+    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    
     // Video Mirror
     [self.rtcEngineKit setLocalVideoMirrorType:ByteRTCMirrorTypeRenderAndEncoder];
     
-    // Audio Capture
-    ByteRTCAudioFormat *audioFormat = [[ByteRTCAudioFormat alloc] init];
-    audioFormat.sampleRate = 44100;
-    audioFormat.channel = 2;
-    [self.rtcEngineKit registerLocalAudioProcessor:self format:audioFormat];
+    // Confluence retweet Setting
+    _transcodingSetting = [ByteRTCLiveTranscoding defaultTranscoding];
 }
 
-#pragma mark - Base
-
-- (void)configEngineWithPushUrl:(NSString *)pushUrl {
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+- (void)startMixStreamRetweetWithPushUrl:(NSString *)pushUrl
+                                hostUser:(LiveUserModel *)hostUser
+                               rtcRoomId:(NSString *)rtcRoomId {
     if (NOEmptyStr(pushUrl)) {
         [self startCapture];
-        //ByteRTCVideoSinkDelegate
-        [self.rtcEngineKit setLocalVideoSink:ByteRTCStreamIndexMain
-                                    withSink:self
-                             withPixelFormat:ByteRTCVideoSinkPixelFormatI420];
         
-        _transcodingSetting = [ByteRTCLiveTranscoding defaultTranscoding];
-        self.pushConfig.url = pushUrl;
-        NSLog(@"Manager Push setupLivePushSession %@", pushUrl);
+        if (IsEmptyStr(rtcRoomId)) {
+            NSLog(@"Manager RTCSDK startLiveTranscoding error : roomid nil");
+        }
+        
+        // Set mix SEI
+        NSString *json = [self getSEIJsonWithMixStatus:RTCMixStatusSingleLive];
+        
+        // Regions
+        NSArray *regions = [self getRegionWithUserList:@[hostUser]
+                                        mixStatus:RTCMixStatusSingleLive
+                                             rtcRoomId:rtcRoomId];
+        
+        _transcodingSetting.layout.appData = json;
+        _transcodingSetting.layout.regions = regions;
+        _transcodingSetting.roomId = rtcRoomId;
+        _transcodingSetting.userId = [LocalUserComponents userModel].uid;
+        _transcodingSetting.url = pushUrl;
+        _transcodingSetting.expectedMixingType = ByteRTCStreamMixingTypeByServer;
+        _transcodingSetting.audio.sampleRate = 44100;
+        _transcodingSetting.audio.channels = 2;
+        _transcodingSetting.video.fps = [LiveSettingVideoConfig defultVideoConfig].fps;
+        _transcodingSetting.video.kBitRate = [LiveSettingVideoConfig defultVideoConfig].bitrate;
+        _transcodingSetting.video.width = [LiveSettingVideoConfig defultVideoConfig].videoSize.width;
+        _transcodingSetting.video.height = [LiveSettingVideoConfig defultVideoConfig].videoSize.height;
+        
+        int result = [self.rtcEngineKit startLiveTranscoding:@""
+                                                 transcoding:_transcodingSetting
+                                                    observer:self];
+        NSLog(@"Manager RTCSDK startMixStreamRetweetWithPushUrl %@ %d", pushUrl, result);
     }
+}
+
+- (void)updateTranscodingLayout:(NSArray<LiveUserModel *> *)userList
+                      mixStatus:(RTCMixStatus)mixStatus
+                      rtcRoomId:(NSString *)rtcRoomId {
+    // Set mix SEI
+    NSString *json = [self getSEIJsonWithMixStatus:mixStatus];
+    
+    // Servers merge, take half of the maximum resolution
+    CGSize pushRTCVideoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+    if (mixStatus == RTCMixStatusCoHost) {
+        pushRTCVideoSize = [self getMaxUserVideSize:userList];
+    }
+    self.pushRTCVideoConfig.videoSize = pushRTCVideoSize;
+    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    
+    _transcodingSetting.layout.appData = json;
+    _transcodingSetting.layout.regions = [self getRegionWithUserList:userList
+                                                           mixStatus:mixStatus
+                                                           rtcRoomId:rtcRoomId];
+    [self.rtcEngineKit updateLiveTranscoding:@""
+                                 transcoding:_transcodingSetting];
+    NSLog(@"Manager RTCSDK updateTranscodingLayout");
+}
+
+- (void)startForwardStreamToRooms:(NSString *)roomId token:(NSString *)token {
+    ForwardStreamConfiguration *configuration = [[ForwardStreamConfiguration alloc] init];
+    configuration.roomId = roomId;
+    configuration.token = token;
+    [self.rtcEngineKit startForwardStreamToRooms:@[configuration]];
+    
+    NSLog(@"Manager RTCSDK startForwardStreamToRooms %@", roomId);
+}
+
+- (void)stopForwardStreamToRooms {
+    self.pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    _mixStatus = RTCMixStatusSingleLive;
+    [self.rtcEngineKit stopForwardStreamToRooms];
+    
+    NSLog(@"Manager RTCSDK stopForwardStreamToRooms");
 }
 
 #pragma mark - Setting
@@ -191,20 +227,14 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
 
 - (void)leaveLiveRoom {
     [self.rtcEngineKit setAudioFrameObserver:nil];
-    
-    [self closeTranscoding];
+    [self.rtcEngineKit stopLiveTranscoding:@""];
     [self stopCapture];
     [self leaveRTCRoom];
     [self leaveMultiRoom];
     [self.streamViewDic removeAllObjects];
     self.cameraID = ByteRTCCameraIDFront;
     
-    if (self.livePushEngine) {
-        [self stopPush];
-        self.livePushEngine = nil;
-    }
     [self stopPull];
-    _pushConfig = nil;
     _pushRTCVideoConfig = nil;
     NSLog(@"Manager leaveLiveRoom");
 }
@@ -221,95 +251,27 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
     [self enableLocalVideo:YES];
 }
 
-- (void)startPush:(void (^)(BOOL isStarted))block {
-    _pushStateBlock = block;
-    
-    if (!self.livePushEngine) {
-        self.livePushEngine = [[LFLiveSession alloc] initWithAudioConfiguration:self.pushConfig.audioConfiguration
-                                                             videoConfiguration:self.pushConfig.videoConfiguration
-                                                                    captureType:LFLiveInputMaskAll];
-        self.livePushEngine.reconnectCount = 10;
-        self.livePushEngine.reconnectInterval = 5;
-        self.livePushEngine.adaptiveBitrate = YES;
-        self.livePushEngine.delegate = self;
-        NSLog(@"Manager Push create livePushEngine");
-    }
-    
-    if (!_isPush) {
-        _isPush = YES;
-        [self.livePushEngine startLive:self.pushConfig];
-        NSLog(@"Manager PushEngine startPush");
-    } else {
-        if (block) {
-            block(YES);
-        }
-    }
-}
-
 - (void)stopCapture {
     [self enableLocalAudio:NO];
     [self enableLocalVideo:NO];
 }
 
-- (void)stopPush {
-    if (_isPush) {
-        _isPush = NO;
-        _isPushStarted = NO;
-        [self.livePushEngine stopLive];
-        NSLog(@"Manager PushEngine stopPush");
-    }
-}
-
 - (void)updateRes:(CGSize)size {
-    self.pushConfig.videoConfiguration.videoSize = size;
     self.pushRTCVideoConfig.videoSize = size;
     [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
     NSLog(@"Manager PushEngine updateRes");
 }
 
 - (void)updateFPS:(CGFloat)fps {
-    self.pushConfig.videoConfiguration.videoFrameRate = fps;
     self.pushRTCVideoConfig.frameRate = fps;
     [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
     NSLog(@"Manager PushEngine updateFPS");
 }
 
 - (void)updateKBitrate:(NSInteger)kbitrate min:(NSInteger)min max:(NSInteger)max {
-    self.pushConfig.videoConfiguration.videoBitRate = kbitrate * 1000;
-    self.pushConfig.videoConfiguration.videoMinBitRate = min * 1000;
-    self.pushConfig.videoConfiguration.videoMaxBitRate = max * 1000;
     self.pushRTCVideoConfig.maxKbps = kbitrate;
     [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
     NSLog(@"Manager PushEngine updateKBitrate");
-}
-
-- (LFLiveStreamInfo *)pushConfig {
-    if (!_pushConfig) {
-        LFLiveAudioConfiguration *audio = [LFLiveAudioConfiguration defaultConfiguration];
-        audio.audioSampleRate = 44100;
-        LFLiveVideoConfiguration *video = [LFLiveVideoConfiguration defaultConfiguration];
-        video.videoSizeRespectingAspectRatio = YES;
-        video.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
-        video.videoBitRate = [LiveSettingVideoConfig defultVideoConfig].bitrate * 1000;
-        video.videoMinBitRate = [LiveSettingVideoConfig defultVideoConfig].minBitrate * 1000;
-        video.videoMaxBitRate = [LiveSettingVideoConfig defultVideoConfig].maxBitrate * 1000;
-        video.videoFrameRate = [LiveSettingVideoConfig defultVideoConfig].fps;
-        
-        _pushConfig = [[LFLiveStreamInfo alloc] init];
-        _pushConfig.audioConfiguration = audio;
-        _pushConfig.videoConfiguration = video;
-    }
-    return _pushConfig;
-}
-
-- (ByteRTCVideoSolution *)pushRTCVideoConfig {
-    if (!_pushRTCVideoConfig) {
-        _pushRTCVideoConfig = [[ByteRTCVideoSolution alloc] init];
-        _pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
-        _pushRTCVideoConfig.frameRate = [LiveSettingVideoConfig defultVideoConfig].fps;
-        _pushRTCVideoConfig.maxKbps = [LiveSettingVideoConfig defultVideoConfig].bitrate;
-    }
-    return _pushRTCVideoConfig;
 }
 
 #pragma mark - Pull
@@ -352,7 +314,7 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
 #pragma mark - Live Cohost / AddGuests
 
 - (void)joinRTCRoomByToken:(NSString *)token
-                    roomID:(NSString *)roomID
+                 rtcRoomID:(NSString *)rtcRoomID
                     userID:(NSString *)userID {
     ByteRTCUserInfo *userInfo = [[ByteRTCUserInfo alloc] init];
     userInfo.userId = userID;
@@ -364,16 +326,14 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
     config.isAutoSubscribeVideo = YES;
     
     [self.rtcEngineKit joinRoomByKey:token
-                        roomId:roomID
-                      userInfo:userInfo
-                 rtcRoomConfig:config];
+                              roomId:rtcRoomID
+                            userInfo:userInfo
+                       rtcRoomConfig:config];
     
-    _rtcRoomID = roomID;
-    NSLog(@"Manager RTCSDK joinRoomByKey %@|%@", roomID, userID);
+    NSLog(@"Manager RTCSDK joinRoomByKey %@|%@", rtcRoomID, userID);
 }
 
 - (void)leaveRTCRoom {
-    _rtcRoomID = @"";
     NSString *saveKey = @"";
     UIView *saveView = nil;
     for (NSString *key in self.streamViewDic.allKeys) {
@@ -400,191 +360,15 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
     }
 }
 
-- (void)openTranscodingByUserList:(NSArray<LiveUserModel *> *)userList
-                          pushUrl:(NSString *)pushUrl
-                      isMixServer:(BOOL)isMixServer
-                         isCoHost:(BOOL)isCoHost {
-    _mixType = isMixServer ? RTCMixTypeServer : RTCMixTypeClient;
-    _mixStatus = isCoHost ? RTCMixStatusCoHost : RTCMixStatusAddGuests;
-    CGSize pushRTCVideoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
-    if (isMixServer) {
-        // Close push, use mix server to merge and push.
-        [self stopPush];
-        // Sender mix SEI
-        NSString *value = isCoHost ? kLiveCoreSEIValueSourceCoHost : kLiveCoreSEIValueSourceNone;
-        NSDictionary *dic = @{kLiveCoreSEIKEYSource : value};
-        NSString *json = [dic yy_modelToJSONString];
-        _transcodingSetting.layout.appData = json;
-    }
-    if (_mixStatus == RTCMixStatusCoHost) {
-        if (isMixServer) {
-            // 服务器合流，取最大分辨率的一半
-            pushRTCVideoSize = [self getMaxUserVideSize:userList];
-        } else {
-            // 客户端合流，取对方分辨率的一半
-            pushRTCVideoSize = [self getOtherUserVideSize:userList];
-        }
-    }
-    self.pushRTCVideoConfig.videoSize = pushRTCVideoSize;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
-    
-    _transcodingSetting.roomId = _rtcRoomID;
-    _transcodingSetting.userId = [LocalUserComponents userModel].uid;
-    _transcodingSetting.url = pushUrl;
-    _transcodingSetting.expectedMixingType = isMixServer ? ByteRTCStreamMixingTypeByServer : ByteRTCStreamMixingTypeByClient;
-    _transcodingSetting.layout.regions = [self getRegionWithUserList:userList
-                                                            isCoHost:isCoHost
-                                                         isMixServer:isMixServer];
-    _transcodingSetting.audio.sampleRate = 44100;
-    _transcodingSetting.audio.channels = 2;
-    _transcodingSetting.video.fps = [LiveSettingVideoConfig defultVideoConfig].fps;
-    _transcodingSetting.video.kBitRate = [LiveSettingVideoConfig defultVideoConfig].bitrate;
-    _transcodingSetting.video.width = [LiveSettingVideoConfig defultVideoConfig].videoSize.width;
-    _transcodingSetting.video.height = [LiveSettingVideoConfig defultVideoConfig].videoSize.height;
-    
-    [self.rtcEngineKit startLiveTranscoding:@"" transcoding:_transcodingSetting observer:self];
-    NSLog(@"Manager RTCSDK startLiveTranscoding");
-}
-
-- (void)closeTranscoding {
-    [self.rtcEngineKit stopLiveTranscoding:@""];
-    if (_mixStatus == RTCMixStatusCoHost) {
-        self.pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
-        [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
-    }
-    _mixType = RTCMixTypeClose;
-    _mixStatus = RTCMixStatusNone;
-    
-    NSLog(@"Manager RTCSDK closeTranscoding");
-}
-
-- (void)updateTranscodingLayout:(NSArray<LiveUserModel *> *)userList
-                       isCoHost:(BOOL)isCoHost
-                    isMixServer:(BOOL)isMixServer {
-    _transcodingSetting.layout.regions = [self getRegionWithUserList:userList
-                                                            isCoHost:isCoHost
-                                                         isMixServer:isMixServer];
-    [self.rtcEngineKit updateLiveTranscoding:@"" transcoding:_transcodingSetting];
-    NSLog(@"Manager RTCSDK updateTranscodingLayout");
-}
-
-#pragma mark - LFLiveSessionDelegate
-
-- (void)liveSession:(LFLiveSession *)session liveStateDidChange:(LFLiveState)state {
-    BOOL isStarted = NO;
-    if (state == LFLiveStart) {
-        isStarted = YES;
-        self.isPushStarted = isStarted;
-        if (self.networkQualityBlock) {
-            self.networkQualityBlock(LiveNetworkQualityStatusNone, [LocalUserComponents userModel].uid);
-        }
-    }
-    if (self.pushStateBlock) {
-        self.pushStateBlock(isStarted);
-    }
-    NSLog(@"Manager PushEngine state: %ld", (long)state);
-}
-
-- (void)liveSession:(nullable LFLiveSession *)session errorCode:(LFLiveSocketErrorCode)errorCode {
-    NSLog(@"Manager PushEngine errorCode: %ld", errorCode);
-}
-
-#pragma mark - ByteRTCVideoSinkDelegate
-
-- (void)renderPixelBuffer:(CVPixelBufferRef _Nonnull)pixelBuffer
-                 rotation:(ByteRTCVideoRotation)rotation
-             extendedData:(NSData * _Nullable)extendedData {
-    if (RTCMixTypeClose == _mixType) {
-        int srcWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
-        int srcHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
-        CVPixelBufferRef pixelBufferRotate = NULL;
-        CFDictionaryRef empty = CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
-                                 [NSNumber numberWithBool:YES], kCVPixelBufferCGImageCompatibilityKey, [NSNumber numberWithBool:YES], kCVPixelBufferCGBitmapContextCompatibilityKey, empty, kCVPixelBufferIOSurfacePropertiesKey, nil];
-        //swap width&height
-        CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, srcHeight, srcWidth, kCVPixelFormatType_420YpCbCr8Planar, (__bridge CFDictionaryRef)options, &pixelBufferRotate);
-        if (status == kCVReturnSuccess) {
-            CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-            CVPixelBufferLockBaseAddress(pixelBufferRotate, 0);
-            
-            uint8_t *src_y = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0);
-            uint8_t *src_u = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1);
-            uint8_t *src_v = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 2);
-            int src_stride_y = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-            int src_stride_u = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1);
-            int src_stride_v = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 2);
-            
-            uint8_t *dst_y = CVPixelBufferGetBaseAddressOfPlane(pixelBufferRotate, 0);
-            uint8_t *dst_u = CVPixelBufferGetBaseAddressOfPlane(pixelBufferRotate, 1);
-            uint8_t *dst_v = CVPixelBufferGetBaseAddressOfPlane(pixelBufferRotate, 2);
-            int dst_stride_y = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBufferRotate, 0);
-            int dst_stride_u = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBufferRotate, 1);
-            int dst_stride_v = (int)CVPixelBufferGetBytesPerRowOfPlane(pixelBufferRotate, 2);
-            
-            I420Rotate(src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v, dst_y, dst_stride_y, dst_u, dst_stride_u, dst_v, dst_stride_v, srcWidth, srcHeight, kRotate90);
-        } else {
-            NSLog(@"I420BufferRotate Create failed");
-        }
-        
-        
-        CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-        CVPixelBufferUnlockBaseAddress(pixelBufferRotate, 0);
-        
-        [self.livePushEngine pushVideo:pixelBufferRotate];
-        CVPixelBufferRelease(pixelBufferRotate);
-    }
-}
-
-- (int)getRenderElapse {
-    return 0;
-}
-
-#pragma mark - ByteRTCAudioProcessor
-
-- (int)processAudioFrame:(ByteRTCAudioFrame *)audioFrame {
-    if (RTCMixTypeClose == _mixType) {
-        [self.livePushEngine pushAudio:audioFrame.buffer];
-    }
-    return 0;
-}
 
 #pragma mark - LiveTranscodingDelegate
 
-- (void)onStreamMixingEvent:(ByteRTCStreamMixingEvent)event
-                     taskId:(NSString *)taskId
-                      error:(ByteRtcTranscoderErrorCode)Code
-                    mixType:(ByteRTCStreamMixingType)mixType {
-    if (event == ByteRTCStreamMixingEventStartSuccess) {
-        if (mixType == ByteRTCStreamMixingTypeByClient) {
-            _mixType = RTCMixTypeClient;
-        } else if (mixType == ByteRTCStreamMixingTypeByServer) {
-            _mixType = RTCMixTypeServer;
-            [self stopPush];
-        } else {
-            // Error
-        }
-    }
-    NSLog(@"Manager RTCSDK onStreamMixingEvent %lu %lu", (unsigned long)_mixType, (unsigned long)event);
-}
-
-- (void)onMixingAudioFrame:(ByteRTCAudioFrame *_Nonnull)audioFrame taskId:(NSString * _Nonnull)taskId {
-    if (_mixType == RTCMixTypeClient) {
-        [self.livePushEngine pushAudio:audioFrame.buffer];
-    }
-}
-
-- (void)onMixingVideoFrame:(ByteRTCVideoFrame *_Nonnull)videoFrame taskId:(NSString * _Nonnull)taskId {
-    if (_mixType == RTCMixTypeClient) {
-        [self.livePushEngine pushVideo:videoFrame.textureBuf];
-    }
+- (void)onStreamMixingEvent:(ByteRTCStreamMixingEvent)event taskId:(NSString *)taskId error:(ByteRtcTranscoderErrorCode)Code mixType:(ByteRTCStreamMixingType)mixType {
+    NSLog(@"Manager RTCSDK onStreamMixingEvent %lu %lu %lu", (unsigned long)Code, (unsigned long)mixType, (unsigned long)event);
 }
 
 - (BOOL)isSupportClientPushStream {
-    if (_mixType == RTCMixTypeClient) {
-        return YES;
-    } else {
-        return NO;
-    }
+    return NO;
 }
 
 #pragma mark - ByteRTCEngineDelegate
@@ -592,12 +376,24 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
 - (void)rtcEngine:(ByteRTCEngineKit *)engine onRoomStateChanged:(NSString *)roomId withUid:(NSString *)uid state:(NSInteger)state extraInfo:(NSString *)extraInfo {
     [super rtcEngine:engine onRoomStateChanged:roomId withUid:uid state:state extraInfo:extraInfo];
     [self bingCanvasViewToUid:uid];
-    NSLog(@"Manager RTCSDK join %@|%ld", uid, state);
+    NSLog(@"Manager RTCSDK join %@|%ld", uid, (long)state);
 }
 
 - (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onUserJoined:(nonnull ByteRTCUserInfo *)userInfo elapsed:(NSInteger)elapsed {
     NSLog(@"Manager RTCSDK onUserJoined %@", userInfo.userId);
     [self bingCanvasViewToUid:userInfo.userId];
+}
+
+- (void)rtcEngine:(ByteRTCEngineKit *)engine onUserPublishStream:(NSString *)userId type:(ByteRTCMediaStreamType)type {
+    if (type == ByteRTCMediaStreamTypeBoth ||
+        type == ByteRTCMediaStreamTypeVideo) {
+        dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
+            if (self.onUserPublishStreamBlock) {
+                self.onUserPublishStreamBlock(userId);
+            }
+        }));
+    }
+    NSLog(@"Manager RTCSDK onUserPublishStream %@ %lu", userId, (unsigned long)type);
 }
 
 - (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onFirstRemoteVideoFrameRendered:(ByteRTCRemoteStreamKey *_Nonnull)streamKey withFrameInfo:(ByteRTCVideoFrameInfo *_Nonnull)frameInfo {
@@ -630,88 +426,115 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
     }
 }
 
+- (void)rtcEngine:(ByteRTCEngineKit *)engine onForwardStreamStateChanged:(NSArray<ForwardStreamStateInfo *> *)infos {
+    NSLog(@"Manager RTCSDK onForwardStreamStateChanged %@", infos);
+}
+
 #pragma mark - NetworkQuality
 
 - (void)didChangeNetworkQuality:(void (^)(LiveNetworkQualityStatus status, NSString *uid))block {
     self.networkQualityBlock = block;
 }
 
+#pragma mark - Getter
+
+- (ByteRTCVideoSolution *)pushRTCVideoConfig {
+    if (!_pushRTCVideoConfig) {
+        _pushRTCVideoConfig = [[ByteRTCVideoSolution alloc] init];
+        _pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+        _pushRTCVideoConfig.frameRate = [LiveSettingVideoConfig defultVideoConfig].fps;
+        _pushRTCVideoConfig.maxKbps = [LiveSettingVideoConfig defultVideoConfig].bitrate;
+    }
+    return _pushRTCVideoConfig;
+}
+
+
 #pragma mark - Private Action
 
-- (NSArray <ByteRTCVideoCompositingRegion *> *)getRegionWithUserList:(NSArray <LiveUserModel *> *)userList
-                                                            isCoHost:(BOOL)isCoHost
-                                                         isMixServer:(BOOL)isMixServer {
+- (NSString *)getSEIJsonWithMixStatus:(RTCMixStatus)mixStatus {
+    NSString *value = (mixStatus == RTCMixStatusCoHost) ? kLiveCoreSEIValueSourceCoHost : kLiveCoreSEIValueSourceNone;
+    NSDictionary *dic = @{kLiveCoreSEIKEYSource : value};
+    NSString *json = [dic yy_modelToJSONString];
+    return json;
+}
+
+- (NSArray *)getRegionWithUserList:(NSArray <LiveUserModel *> *)userList
+                         mixStatus:(RTCMixStatus)mixStatus
+                         rtcRoomId:(NSString *)rtcRoomId {
     NSInteger audienceIndex = 0;
     NSMutableArray *list = [[NSMutableArray alloc] init];
     for (int i = 0; i < userList.count; i++) {
         LiveUserModel *userModel = userList[i];
         ByteRTCVideoCompositingRegion *region = [[ByteRTCVideoCompositingRegion alloc] init];
         region.uid = userModel.uid;
-        region.roomId = _rtcRoomID;
+        region.roomId = rtcRoomId;
         region.localUser = [userModel.uid isEqualToString:[LocalUserComponents userModel].uid] ? YES : NO;
+        region.renderMode = ByteRTCRenderModeHidden;
         NSLog(@"Manager RTCSDK region user %d|%@", region.localUser, userModel.uid);
-        if (isCoHost) {
-            if (userList.count < 2) {
-                break;
-            }
-            region.renderMode = ByteRTCRenderModeHidden;
-            if (region.localUser) {
-                region.x = 0.0;
-                region.y = 0.25;
-                region.width = 0.5;
-                region.height = 0.5;
-                region.zOrder = 0;
-                region.alpha = 1.0;
-            } else {
-                region.x = 0.5;
-                region.y = 0.25;
-                region.width = 0.5;
-                region.height = 0.5;
-                region.zOrder = 0;
-                region.alpha = 1.0;
-            }
-        } else {
-            if (userList.count < 2) {
-                break;
-            }
-            region.renderMode = ByteRTCRenderModeHidden;
-            if (region.localUser) {
+        switch (mixStatus) {
+            case RTCMixStatusSingleLive: {
                 region.x = 0.0;
                 region.y = 0.0;
                 region.width = 1.0;
                 region.height = 1.0;
                 region.zOrder = 1;
                 region.alpha = 1.0;
-            } else {
-                CGFloat screenW = 365.0;
-                CGFloat screenH = 667.0;
-                CGFloat itemHeight = 80.0;
-                CGFloat itemSpace = 6.0;
-                CGFloat itemRightSpace = 52;
-                CGFloat itemTopSpace = 500.0;
-                NSInteger index = audienceIndex++;
-                CGFloat regionHeight = itemHeight / screenH;
-                CGFloat regionWidth = regionHeight * screenH / screenW;
-                CGFloat regionY = (itemTopSpace - (itemHeight + itemSpace) * index) / screenH;
-                CGFloat regionX = 1 - (regionHeight * screenH + itemRightSpace) / screenW;
+            } break;
                 
-                region.x = regionX;
-                region.y = regionY;
-                region.width = regionWidth;
-                region.height = regionHeight;
-                region.zOrder = 2;
-                region.alpha = 1.0;
-            }
+            case RTCMixStatusCoHost: {
+                if (region.localUser) {
+                    region.x = 0.0;
+                    region.y = 0.25;
+                    region.width = 0.5;
+                    region.height = 0.5;
+                    region.zOrder = 0;
+                    region.alpha = 1.0;
+                } else {
+                    region.x = 0.5;
+                    region.y = 0.25;
+                    region.width = 0.5;
+                    region.height = 0.5;
+                    region.zOrder = 0;
+                    region.alpha = 1.0;
+                }
+            } break;
+                
+            case RTCMixStatusAddGuests: {
+                if (region.localUser) {
+                    region.x = 0.0;
+                    region.y = 0.0;
+                    region.width = 1.0;
+                    region.height = 1.0;
+                    region.zOrder = 1;
+                    region.alpha = 1.0;
+                } else {
+                    CGFloat screenW = 365.0;
+                    CGFloat screenH = 667.0;
+                    CGFloat itemHeight = 80.0;
+                    CGFloat itemSpace = 6.0;
+                    CGFloat itemRightSpace = 52;
+                    CGFloat itemTopSpace = 500.0;
+                    NSInteger index = audienceIndex++;
+                    CGFloat regionHeight = itemHeight / screenH;
+                    CGFloat regionWidth = regionHeight * screenH / screenW;
+                    CGFloat regionY = (itemTopSpace - (itemHeight + itemSpace) * index) / screenH;
+                    CGFloat regionX = 1 - (regionHeight * screenH + itemRightSpace) / screenW;
+
+                    region.x = regionX;
+                    region.y = regionY;
+                    region.width = regionWidth;
+                    region.height = regionHeight;
+                    region.zOrder = 2;
+                    region.alpha = 1.0;
+                }
+            } break;
+
+            default:
+                break;
         }
         [list addObject:region];
     }
     return [list copy];
-}
-
-- (CMTime)getCMTime {
-    int64_t value = (int64_t)(CACurrentMediaTime() * 1000000000);
-    CMTime time = CMTimeMake(value, 1000000000);
-    return time;
 }
 
 - (UIView *)getStreamViewWithUid:(NSString *)uid {
