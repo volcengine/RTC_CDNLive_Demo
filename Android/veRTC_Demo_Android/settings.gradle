@@ -3,4 +3,4 @@ include ':scene-core'
 rootProject.name = "veRTC_Demo"
 include ':login'
 
-include ':interactivelive'
+include ':solutions:interactivelive'

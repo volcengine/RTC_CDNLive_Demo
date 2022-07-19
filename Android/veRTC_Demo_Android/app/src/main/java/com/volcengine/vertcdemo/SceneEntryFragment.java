@@ -105,10 +105,12 @@ public class SceneEntryFragment extends Fragment {
      * @param targetActivity 开启目标业务场景的入口Activity类名
      */
     private void startScene(String sceneNameAbbr, String token, String targetActivity) {
-        setAppInfoAndJoinRTM(sceneNameAbbr, token, new IRequestCallback<ServerResponse<RtmInfo>>() {
+        setAppInfoAndJoinRTM(sceneNameAbbr, targetActivity, token, new IRequestCallback<ServerResponse<RtmInfo>>() {
             @Override
             public void onSuccess(ServerResponse<RtmInfo> response) {
-                if (!isVisible()) return;
+                if (!isVisible()) {
+                    return;
+                }
                 RtmInfo data = response == null ? null : response.getData();
                 if (data == null || !data.isValid()) {
                     onError(-1, "");
@@ -142,6 +144,7 @@ public class SceneEntryFragment extends Fragment {
      * @param callBack       请求回调
      */
     private static void setAppInfoAndJoinRTM(String scenesNameAbbr,
+                                             String targetActivity,
                                              String loginToken,
                                              IRequestCallback<ServerResponse<RtmInfo>> callBack) {
         try {
@@ -150,6 +153,9 @@ public class SceneEntryFragment extends Fragment {
             content.put("app_key", VolcConstants.APP_KEY);
             content.put("volc_ak", VolcConstants.VOLC_AK);
             content.put("volc_sk", VolcConstants.VOLC_SK);
+            content.put("scenes_name", scenesNameAbbr);
+            content.put("login_token", loginToken);
+
             content.put("account_id", VolcConstants.ACCOUNT_ID);
             content.put("vod_space", VolcConstants.VOD_SPACE);
 
@@ -158,32 +164,7 @@ public class SceneEntryFragment extends Fragment {
             params.put("content", content.toString());
             params.put("device_id", SolutionDataManager.ins().getDeviceId());
 
-            HttpRequestHelper.sendPost(params, Void.class, new IRequestCallback<ServerResponse<Void>>() {
-                @Override
-                public void onSuccess(ServerResponse<Void> data) {
-                    try {
-                        JSONObject content = new JSONObject();
-                        content.put("scenes_name", scenesNameAbbr);
-                        content.put("login_token", loginToken);
-
-                        JSONObject params = new JSONObject();
-                        params.put("event_name", "joinRTM");
-                        params.put("content", content.toString());
-                        params.put("app_id", VolcConstants.APP_ID);
-                        params.put("device_id", SolutionDataManager.ins().getDeviceId());
-
-                        HttpRequestHelper.sendPost(params, RtmInfo.class, callBack);
-                    } catch (Exception e) {
-                        Log.d(TAG, "joinRTM failed", e);
-                        onError(-1, e.getMessage());
-                    }
-                }
-
-                @Override
-                public void onError(int errorCode, String message) {
-                    callBack.onError(errorCode, message);
-                }
-            });
+            HttpRequestHelper.sendPost(params, RtmInfo.class, callBack);
         } catch (Exception e) {
             Log.d(TAG, "setAppInfo failed", e);
             callBack.onError(-1, e.getMessage());

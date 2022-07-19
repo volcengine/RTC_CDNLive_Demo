@@ -24,6 +24,7 @@
         android:theme="@style/AppTheme">
 
         <activity
+            android:exported="true"
             android:name="com.volcengine.vertcdemo.MainActivity"
             android:screenOrientation="portrait">
             <intent-filter>

@@ -62,6 +62,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled false
@@ -124,7 +127,7 @@ dependencies {
 
     implementation project(":scene-core")
 
-    implementation project(":interactivelive")
+    implementation project(":solutions:interactivelive")
 }
 
 private def ensureProperty(String propertyName) {

@@ -80,7 +80,7 @@ public abstract class RTCEventHandlerWithRTM extends IRTCEngineEventHandler {
      * @param extraInfo 额外信息
      * @return true:加入房间成功
      */
-    protected boolean joinRoomSuccessWhenFirst(int state, String extraInfo) {
+    protected boolean isFirstJoinRoomSuccess(int state, String extraInfo) {
         int joinType = -1;
         try {
             Map extra = GsonUtils.gson().fromJson(extraInfo, Map.class);
@@ -90,5 +90,23 @@ public abstract class RTCEventHandlerWithRTM extends IRTCEngineEventHandler {
             e.printStackTrace();
         }
         return joinType == 0 && state == 0;
+    }
+
+    /**
+     * 获取进房类型
+     *
+     * @param extraInfo 进房回调接口返回的额外信息
+     *                  joinType表示加入房间的类型，0为首次进房，1为重连进房。
+     */
+    protected int joinRoomType(String extraInfo) {
+        int joinType = -1;
+        try {
+            Map extra = GsonUtils.gson().fromJson(extraInfo, Map.class);
+            // 341后 SDK传的固定键
+            joinType = (int) Double.parseDouble(extra.get("join_type").toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return joinType;
     }
 }

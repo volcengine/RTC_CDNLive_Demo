@@ -20,12 +20,15 @@ public class RtmInfo implements Parcelable {
     public String serverUrl;
     @SerializedName("server_signature")
     public String serverSignature;
+    @SerializedName("bid")
+    public String bid;
 
-    public RtmInfo(String appId, String rtmToken, String serverUrl, String serverSignature) {
+    public RtmInfo(String appId, String rtmToken, String serverUrl, String serverSignature, String bid) {
         this.appId = appId;
         this.rtmToken = rtmToken;
         this.serverUrl = serverUrl;
         this.serverSignature = serverSignature;
+        this.bid = bid;
     }
 
     @Override
@@ -35,6 +38,7 @@ public class RtmInfo implements Parcelable {
                 ", rtmToken='" + rtmToken + '\'' +
                 ", serverUrl='" + serverUrl + '\'' +
                 ", serverSignature='" + serverSignature + '\'' +
+                ", bid='" + bid + '\'' +
                 '}';
     }
 
@@ -46,7 +50,8 @@ public class RtmInfo implements Parcelable {
         return !TextUtils.isEmpty(appId)
                 && !TextUtils.isEmpty(rtmToken)
                 && !TextUtils.isEmpty(serverUrl)
-                && !TextUtils.isEmpty(serverSignature);
+                && !TextUtils.isEmpty(serverSignature)
+                && !TextUtils.isEmpty(bid);
     }
 
     @Override
@@ -60,6 +65,7 @@ public class RtmInfo implements Parcelable {
         dest.writeString(this.rtmToken);
         dest.writeString(this.serverUrl);
         dest.writeString(this.serverSignature);
+        dest.writeString(this.bid);
     }
 
     public void readFromParcel(Parcel source) {
@@ -67,6 +73,7 @@ public class RtmInfo implements Parcelable {
         this.rtmToken = source.readString();
         this.serverUrl = source.readString();
         this.serverSignature = source.readString();
+        this.bid = source.readString();
     }
 
     protected RtmInfo(Parcel in) {
@@ -74,6 +81,7 @@ public class RtmInfo implements Parcelable {
         this.rtmToken = in.readString();
         this.serverUrl = in.readString();
         this.serverSignature = in.readString();
+        this.bid = in.readString();
     }
 
     public static final Parcelable.Creator<RtmInfo> CREATOR = new Parcelable.Creator<RtmInfo>() {

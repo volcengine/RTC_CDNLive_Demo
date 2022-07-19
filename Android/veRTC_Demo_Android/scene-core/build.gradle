@@ -44,7 +44,6 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 
     api(name: 'BasicModule', ext: 'aar')
-    api(name: 'hfopenapi', ext: 'aar')
 
     api "com.volcengine:VolcEngineRTC:$VOLCENGINE"
 

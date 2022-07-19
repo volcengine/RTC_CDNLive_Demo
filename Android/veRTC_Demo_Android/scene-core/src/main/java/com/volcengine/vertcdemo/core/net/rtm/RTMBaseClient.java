@@ -6,13 +6,17 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.google.gson.JsonObject;
 import com.ss.bytertc.engine.RTCEngine;
 import com.ss.bytertc.engine.handler.IRTCEngineEventHandler;
 import com.ss.video.rtc.demo.basic_module.utils.AppExecutors;
-import com.ss.video.rtc.demo.basic_module.utils.GsonUtils;
+import com.ss.video.rtc.demo.basic_module.utils.Utilities;
+import com.volcengine.vertcdemo.core.R;
 import com.volcengine.vertcdemo.core.SolutionDataManager;
+import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
+import com.volcengine.vertcdemo.core.eventbus.TokenExpiredEvent;
 import com.volcengine.vertcdemo.core.net.IBroadcastListener;
 import com.volcengine.vertcdemo.core.net.IRequestCallback;
 import com.volcengine.vertcdemo.core.net.ServerResponse;
@@ -50,7 +54,6 @@ public abstract class RTMBaseClient {
     public RTMBaseClient(@NonNull RTCEngine engine, @NonNull RtmInfo rtmInfo) {
         mRTCEngine = engine;
         mRtmInfo = rtmInfo;
-        initEventListener();
     }
 
     /**
@@ -186,7 +189,7 @@ public abstract class RTMBaseClient {
      * @param resultClass 返回数据的class
      * @param callback    回调接口
      */
-    public <T extends RTMBizResponse> void sendServerMessage(String eventName, String roomId, JsonObject content, Class<T> resultClass, IRequestCallback<T> callback) {
+    public <T extends RTMBizResponse> void sendServerMessage(String eventName, String roomId, JsonObject content, @Nullable Class<T> resultClass, IRequestCallback<T> callback) {
         Log.e(TAG, "sendServerMessage eventName:" + eventName + ",content:" + content);
         if (!mInitBizServerCompleted) {
             String msg = "sendServerMessage failed mInitBizServerCompleted: false";
@@ -217,38 +220,44 @@ public abstract class RTMBaseClient {
     /**
      * 收到RTM业务请求回调消息及通知消息，并解析
      */
-    public <T extends RTMBizResponse, D extends RTMBizInform> void onMessageReceived(String uid, String message) {
+    public void onMessageReceived(String uid, String message) {
         try {
             JSONObject messageJson = new JSONObject(message);
             String messageType = messageJson.getString("message_type");
             if (TextUtils.equals(messageType, ServerResponse.MESSAGE_TYPE_RETURN)) {
                 String requestId = messageJson.getString("request_id");
-                RTMRequest request = TextUtils.isEmpty(requestId) ? null : mCallBacksWithRequestId.get(requestId);
-                mCallBacksWithRequestId.remove(requestId);
+                RTMRequest<?> request = mCallBacksWithRequestId.remove(requestId);
                 if (request == null) {
                     Log.e(TAG, "onMessageReceived request is null");
                     return;
                 }
                 Log.e(TAG, String.format("onMessageReceived (%s): %s", request.eventName, message));
-                Class resultClazz = request.resultClass;
-                if (request.resultClass == null) {
-                    request.resultClass = Object.class;
-                }
-                ServerResponse<T> response = new ServerResponse<T>(messageJson, resultClazz);
-                IRequestCallback callback = request.callback;
-                if (response.getCode() == 200) {
-                    notifyRequestSuccess(callback, response.getData());
+
+                final int code = messageJson.optInt("code");
+                if (code == 200) {
+                    final String data = messageJson.optString("response");
+                    AppExecutors.mainThread().execute(() -> request.notifySuccess(data));
                 } else {
-                    notifyRequestFail(response.getCode(), response.getMsg(), callback);
+                    final String msg;
+                    if (code == 450) {
+                        SolutionDemoEventManager.post(new TokenExpiredEvent());
+                        msg = messageJson.optString("message");
+                    } else if (code == 430) {
+                        msg = Utilities.getApplicationContext().getString(R.string.error_msg_sensitive_word_input);
+                    } else {
+                        msg = messageJson.optString("message");
+                    }
+                    AppExecutors.mainThread().execute(() -> request.notifyError(code, msg));
                 }
             } else if (TextUtils.equals(messageType, ServerResponse.MESSAGE_TYPE_INFORM)) {
                 String event = messageJson.getString("event");
                 if (!TextUtils.isEmpty(event)) {
-                    IBroadcastListener<D> eventListener = (IBroadcastListener<D>) mEventListeners.get(event);
-                    Class<D> dataClass = eventListener.getDataClass();
-                    String dataStr = messageJson.optString("data");
-                    Log.e(TAG, String.format("onMessageReceived broadcast: event: %s \n message: %s", event, dataStr));
-                    eventListener.onListener(GsonUtils.gson().fromJson(dataStr, dataClass));
+                    IBroadcastListener<?> eventListener = mEventListeners.get(event);
+                    if (eventListener != null) {
+                        String dataStr = messageJson.optString("data");
+                        Log.e(TAG, String.format("onMessageReceived broadcast: event: %s \n message: %s", event, dataStr));
+                        eventListener.onData(dataStr);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -256,19 +265,10 @@ public abstract class RTMBaseClient {
         }
     }
 
-    private <T> void notifyRequestFail(int code, String msg, IRequestCallback<T> callback) {
+    private static void notifyRequestFail(int code, String msg, IRequestCallback<?> callback) {
         AppExecutors.mainThread().execute(() -> {
             if (callback == null) return;
             callback.onError(code, msg);
-        });
-    }
-
-    private <T extends RTMBizResponse> void notifyRequestSuccess(IRequestCallback<T> callback, T data) {
-        AppExecutors.mainThread().execute(() -> {
-            if (callback == null) {
-                return;
-            }
-            callback.onSuccess(data);
         });
     }
 
@@ -279,20 +279,6 @@ public abstract class RTMBaseClient {
             mLoginCallback = null;
         });
     }
-
-    /**
-     * 构造请求参数JsonObject
-     *
-     * @param cmd 请求cmd
-     * @return
-     */
-    protected abstract JsonObject getCommonParams(String cmd);
-
-    /**
-     * 初始化事件监听器
-     */
-    protected abstract void initEventListener();
-
 
     /**
      * 登陆成功或者失败的回调
