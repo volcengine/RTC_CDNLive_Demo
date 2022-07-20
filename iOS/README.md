@@ -98,7 +98,7 @@
 
 默认的 `vertc.veRTCDemo.ios` 已被注册， 将其修改为其他 Bundle ID，格式为 `vertc.xxx`。
 
-<img src="https://lf6-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_eba6eb84e6e46323dfa6aefaaa33d1d4" width="500px" >
+<img src="https://lf6-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_0159cf55b5a783d4875c89fdc075a3ab" width="500px" >
 
 ### **步骤 5：编译运行**
 
