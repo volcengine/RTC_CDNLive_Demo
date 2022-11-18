@@ -18,6 +18,8 @@ import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveUserInfo;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
+import com.volcengine.vertcdemo.utils.Utils;
 
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_ON;
 
@@ -54,13 +56,18 @@ public class AudienceLayout extends FrameLayout {
         mNamePrefix = view.findViewById(R.id.audience_name_prefix);
         mUserName = view.findViewById(R.id.audience_name);
         bind(null, null);
-        setOnClickListener((v) -> {
+        setOnClickListener(DebounceClickListener.create(v -> {
             if (mUserInfo != null && mOnUserClickListener != null) {
                 mOnUserClickListener.onClick(mUserInfo);
             }
-        });
+        }));
     }
 
+    /**
+     * 用户数据和UI绑定
+     * @param userInfo 用户信息
+     * @param userClickListener 用户点击事件
+     */
     public void bind(LiveUserInfo userInfo, AudienceGroupLayout.OnUserClickListener userClickListener) {
         if (userInfo == null) {
             setNetStatus(null , true);
@@ -72,19 +79,14 @@ public class AudienceLayout extends FrameLayout {
             if (userInfo.cameraStatus == MEDIA_STATUS_ON) {
                 mNamePrefixBg.setVisibility(GONE);
                 mNamePrefix.setVisibility(GONE);
-                if (mUserInfo == null || !TextUtils.equals(userInfo.userId, mUserInfo.userId)
-                        || mUserInfo.cameraStatus != MEDIA_STATUS_ON) {
-                    mVideoContainer.removeAllViews();
-                    FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-                    TextureView renderView = LiveRTCManager.ins().getUserRenderView(userInfo.userId);
-                    Utilities.removeFromParent(renderView);
-                    mVideoContainer.addView(renderView, params);
-                    if (TextUtils.equals(userInfo.userId, SolutionDataManager.ins().getUserId())) {
-                        LiveRTCManager.ins().setLocalVideoView(renderView);
-                    } else {
-                        LiveRTCManager.ins().setRemoteVideoView(userInfo.userId, renderView);
-                    }
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+                TextureView renderView = LiveRTCManager.ins().getUserRenderView(userInfo.userId);
+                Utils.attachViewToViewGroup(mVideoContainer, renderView, params);
+                if (TextUtils.equals(userInfo.userId, SolutionDataManager.ins().getUserId())) {
+                    LiveRTCManager.ins().setLocalVideoView(renderView);
+                } else {
+                    LiveRTCManager.ins().setRemoteVideoView(userInfo.userId,userInfo.roomId, renderView);
                 }
             } else {
                 mVideoContainer.removeAllViews();
@@ -106,6 +108,11 @@ public class AudienceLayout extends FrameLayout {
         mOnUserClickListener = userClickListener;
     }
 
+    /**
+     * 网络状态显示
+     * @param uid 用户id
+     * @param isGood 网络状态
+     */
     public void setNetStatus(String uid, boolean isGood) {
         if (mUserInfo == null || !TextUtils.equals(uid, mUserInfo.userId)) {
             return;

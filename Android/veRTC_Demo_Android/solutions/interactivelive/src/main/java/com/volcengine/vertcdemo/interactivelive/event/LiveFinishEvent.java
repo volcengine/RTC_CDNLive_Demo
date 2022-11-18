@@ -1,10 +1,10 @@
 package com.volcengine.vertcdemo.interactivelive.event;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizInform;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizInform;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 
-public class LiveFinishEvent implements RTMBizInform {
+public class LiveFinishEvent implements RTSBizInform {
 
     @SerializedName("room_id")
     public String roomId;

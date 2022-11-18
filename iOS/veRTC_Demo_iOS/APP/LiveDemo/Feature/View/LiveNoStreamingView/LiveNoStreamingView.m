@@ -2,18 +2,18 @@
 //  LiveNoStreamingView.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/10/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/10/18.
+//  
 //
 
 #import "LiveNoStreamingView.h"
-#import "LiveAvatarCompoments.h"
+#import "LiveAvatarComponent.h"
 #import "LiveStateIconView.h"
 
 @interface LiveNoStreamingView ()
 
 @property (nonatomic, strong) UIView *bgMaskView;
-@property (nonatomic, strong) LiveAvatarCompoments *avatarCompoments;
+@property (nonatomic, strong) LiveAvatarComponent *avatarComponent;
 @property (nonatomic, assign) BOOL hasAddItemLayer;
 
 @end
@@ -28,18 +28,18 @@
           make.edges.equalTo(self);
         }];
 
-        [self addSubview:self.avatarCompoments];
-        [self.avatarCompoments mas_makeConstraints:^(MASConstraintMaker *make) {
+        [self addSubview:self.avatarComponent];
+        [self.avatarComponent mas_makeConstraints:^(MASConstraintMaker *make) {
           make.width.height.mas_equalTo(160);
           make.center.equalTo(self);
         }];
-        self.avatarCompoments.text = @"B";
+        self.avatarComponent.text = @"B";
     }
     return self;
 }
 
 - (void)setUserName:(NSString *)userName {
-    self.avatarCompoments.text = userName;
+    self.avatarComponent.text = userName;
 }
 
 - (void)layoutSubviews {
@@ -63,14 +63,14 @@
     [self.bgMaskView.layer addSublayer:gradientLayer];
 }
 
-- (LiveAvatarCompoments *)avatarCompoments {
-    if (!_avatarCompoments) {
-        _avatarCompoments = [[LiveAvatarCompoments alloc] init];
-        _avatarCompoments.layer.cornerRadius = 80;
-        _avatarCompoments.layer.masksToBounds = YES;
-        _avatarCompoments.fontSize = 80;
+- (LiveAvatarComponent *)avatarComponent {
+    if (!_avatarComponent) {
+        _avatarComponent = [[LiveAvatarComponent alloc] init];
+        _avatarComponent.layer.cornerRadius = 80;
+        _avatarComponent.layer.masksToBounds = YES;
+        _avatarComponent.fontSize = 80;
     }
-    return _avatarCompoments;
+    return _avatarComponent;
 }
 
 - (UIView *)bgMaskView {

@@ -2,8 +2,8 @@
 //  LiveRoomViewController.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import "LiveRoomListsViewController.h"
@@ -60,7 +60,6 @@
 - (void)rightButtonAction:(BaseButton *)sender {
     [super rightButtonAction:sender];
     
-    [[ToastComponents shareToastComponents] showWithMessage:@"加载中"];
     [self loadDataWithGetLists];
 }
 
@@ -72,8 +71,10 @@
 
 - (void)loadDataWithGetLists {
     __weak __typeof(self) wself = self;
+    [[ToastComponent shareToastComponent] showLoading];
     [LiveRTMManager liveClearUserWithBlock:^(RTMACKModel * _Nonnull model) {
         [LiveRTMManager liveGetActiveLiveRoomListWithBlock:^(NSArray<LiveRoomInfoModel *> *roomList, RTMACKModel *model) {
+            [[ToastComponent shareToastComponent] dismiss];
             if (model.result) {
                 wself.roomTableView.dataLists = roomList;
                 if (roomList.count == 0) {
@@ -91,7 +92,7 @@
 #pragma mark - LiveRoomTableViewDelegate
 
 - (void)LiveRoomTableView:(LiveRoomTableView *)LiveRoomTableView didSelectRowAtIndexPath:(LiveRoomInfoModel *)model {
-    [PublicParameterCompoments share].roomId = model.roomID;
+    [PublicParameterComponent share].roomId = model.roomID;
     LiveRoomViewController *next = [[LiveRoomViewController alloc]
                                     initWithRoomModel:model
                                     streamPushUrl:@""];
@@ -166,7 +167,7 @@
 
 - (void)dealloc {
     [[LiveRTCManager shareRtc] destoryEngine];
-    [PublicParameterCompoments clear];
+    [PublicParameterComponent clear];
 }
 
 @end

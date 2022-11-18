@@ -4,14 +4,16 @@ import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.USER
 
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
+
 import com.google.gson.annotations.SerializedName;
 import com.ss.video.rtc.demo.basic_module.utils.GsonUtils;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizResponse;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 
 import java.util.Map;
 
-public class LiveUserInfo implements RTMBizResponse {
+public class LiveUserInfo implements RTSBizResponse {
 
     @SerializedName("room_id")
     public String roomId;
@@ -56,6 +58,20 @@ public class LiveUserInfo implements RTMBizResponse {
         return cameraStatus == LiveDataManager.MEDIA_STATUS_ON;
     }
 
+    /**
+     * 获取用户名称第一位字符
+     *
+     * @return 用户名称第一位字符
+     */
+    public @NonNull
+    String getNamePrefix() {
+        if (TextUtils.isEmpty(userName)) {
+            return "";
+        } else {
+            return userName.substring(0, 1);
+        }
+    }
+
     // 获取用户推流视频宽度
     public int getWidth() {
         if (TextUtils.isEmpty(extra)) {
@@ -64,7 +80,7 @@ public class LiveUserInfo implements RTMBizResponse {
         try {
             Map<String, Double> resp = GsonUtils.gson().fromJson(extra, Map.class);
             Double d = resp.get("width");
-            return d == null ? 0: d.intValue();
+            return d == null ? 0 : d.intValue();
         } catch (Exception e) {
             return 0;
         }
@@ -78,7 +94,7 @@ public class LiveUserInfo implements RTMBizResponse {
         try {
             Map<String, Double> resp = GsonUtils.gson().fromJson(extra, Map.class);
             Double d = resp.get("height");
-            return d == null ? 0: d.intValue();
+            return d == null ? 0 : d.intValue();
         } catch (Exception e) {
             return 0;
         }

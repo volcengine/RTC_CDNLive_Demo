@@ -1,7 +1,7 @@
 package com.volcengine.vertcdemo.interactivelive.bean;
 
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizInform;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizInform;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizResponse;
 
-public class LiveResponse implements RTMBizResponse, RTMBizInform {
+public class LiveResponse implements RTSBizResponse, RTSBizInform {
 }

@@ -25,11 +25,12 @@ import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
 import com.volcengine.vertcdemo.interactivelive.event.AnchorLinkInviteEvent;
 import com.volcengine.vertcdemo.interactivelive.event.AnchorLinkReplyEvent;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class LiveCoHostDialog extends BaseDialog {
@@ -37,7 +38,7 @@ public class LiveCoHostDialog extends BaseDialog {
     private final int mHighLightColor = Color.parseColor("#ffffff");
     private final int mNormalColor = Color.parseColor("#86909C");
 
-    private final List<LiveUserInfo> mCoHostData = new LinkedList<>();
+    private final List<LiveUserInfo> mCoHostData = new ArrayList<>();
     private RecyclerView mHostRv;
     private TextView mNoContentTipTv;
     private CoHostAdapter mCoHostAdapter;
@@ -57,7 +58,12 @@ public class LiveCoHostDialog extends BaseDialog {
 
     public LiveCoHostDialog(Context context, CoHostCallback coHostCallback) {
         super(context, R.style.CommonDialog);
-        this.mCoHostCallback = coHostCallback;
+        this.mCoHostCallback = info -> {
+            LiveCoHostDialog.this.dismiss();
+            if (coHostCallback != null) {
+                coHostCallback.onClick(info);
+            }
+        };
     }
 
     @Override
@@ -94,7 +100,7 @@ public class LiveCoHostDialog extends BaseDialog {
         hostPKTv.setTextColor(mNormalColor);
         raiseIndicator.setVisibility(View.VISIBLE);
         listenerIndicator.setVisibility(View.GONE);
-        coHostTv.setOnClickListener(v -> {
+        coHostTv.setOnClickListener(DebounceClickListener.create(v -> {
             mHostRv.setVisibility(View.VISIBLE);
             coHostTv.setTextColor(mHighLightColor);
             hostPKTv.setTextColor(mNormalColor);
@@ -102,8 +108,8 @@ public class LiveCoHostDialog extends BaseDialog {
             listenerIndicator.setVisibility(View.GONE);
             mNoContentTipTv.setVisibility(mCoHostAdapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
             mNoContentTipTv.setText("暂无其他主播在线");
-        });
-        hostPKTv.setOnClickListener(v -> {
+        }));
+        hostPKTv.setOnClickListener(DebounceClickListener.create(v -> {
             mHostRv.setVisibility(View.GONE);
             coHostTv.setTextColor(mNormalColor);
             hostPKTv.setTextColor(mHighLightColor);
@@ -111,7 +117,7 @@ public class LiveCoHostDialog extends BaseDialog {
             listenerIndicator.setVisibility(View.VISIBLE);
             mNoContentTipTv.setVisibility(View.VISIBLE);
             mNoContentTipTv.setText("主播正在赶来的路上");
-        });
+        }));
     }
 
     private void initWindow() {
@@ -146,12 +152,12 @@ public class LiveCoHostDialog extends BaseDialog {
     }
 
     private void initData() {
-        LiveRTCManager.ins().getRTMClient().requestActiveHostList(mGetActiveHostCallback);
+        LiveRTCManager.ins().getRTSClient().requestActiveHostList(mGetActiveHostCallback);
     }
 
     private static class CoHostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-        private final List<LiveUserInfo> mData = new LinkedList<>();
+        private final List<LiveUserInfo> mData = new ArrayList<>();
         private final CoHostCallback mCoHostCallback;
 
         public CoHostAdapter(List<LiveUserInfo> data, CoHostCallback coHostCallback) {
@@ -201,12 +207,12 @@ public class LiveCoHostDialog extends BaseDialog {
             mUserNameTv = itemView.findViewById(R.id.item_voice_user_name);
             mOptionTv = itemView.findViewById(R.id.item_voice_user_option);
             mCoHostCallback = coHostCallback;
-            mOptionTv.setOnClickListener((v) -> {
+            mOptionTv.setOnClickListener(DebounceClickListener.create(v -> {
                 if (mInfo != null && mCoHostCallback != null) {
                     LiveUserInfo info = mInfo;
                     mCoHostCallback.onClick(info);
                 }
-            });
+            }));
         }
 
         public void bind(LiveUserInfo info) {

@@ -1,11 +1,13 @@
 package com.volcengine.vertcdemo.interactivelive.feature.liveroommain;
 
-import static com.ss.bytertc.engine.handler.IRTCEngineEventHandler.NetworkQuality.NETWORK_QUALITY_EXCELLENT;
-import static com.ss.bytertc.engine.handler.IRTCEngineEventHandler.NetworkQuality.NETWORK_QUALITY_GOOD;
-import static com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout.STATUS_DISABLE;
-import static com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout.STATUS_NORMAL;
+import static android.view.View.GONE;
+import static android.view.View.INVISIBLE;
+import static android.view.View.VISIBLE;
+import static com.ss.bytertc.engine.type.NetworkQuality.NETWORK_QUALITY_EXCELLENT;
+import static com.ss.bytertc.engine.type.NetworkQuality.NETWORK_QUALITY_GOOD;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.INVITE_REPLY_ACCEPT;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.INVITE_REPLY_REJECT;
+import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.LINK_MIC_STATUS_HOST_INTERACTING;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.LINK_MIC_STATUS_OTHER;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.LIVE_PERMIT_TYPE_ACCEPT;
@@ -17,12 +19,13 @@ import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.USER
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.USER_STATUS_AUDIENCE_INTERACTING;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.USER_STATUS_CO_HOSTING;
 import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.USER_STATUS_OTHER;
+import static com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout.STATUS_DISABLE;
+import static com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout.STATUS_NORMAL;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -31,7 +34,6 @@ import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ImageSpan;
 import android.util.Log;
-import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -49,10 +51,12 @@ import com.ss.video.rtc.demo.basic_module.ui.CommonDialog;
 import com.ss.video.rtc.demo.basic_module.utils.GsonUtils;
 import com.ss.video.rtc.demo.basic_module.utils.Utilities;
 import com.ss.video.rtc.demo.basic_module.utils.WindowUtils;
+import com.volcengine.vertcdemo.common.SolutionCommonDialog;
 import com.volcengine.vertcdemo.common.SolutionToast;
 import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.core.eventbus.SocketConnectEvent;
 import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
+import com.volcengine.vertcdemo.core.net.ErrorTool;
 import com.volcengine.vertcdemo.core.net.IRequestCallback;
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.bean.JoinLiveRoomResponse;
@@ -64,18 +68,6 @@ import com.volcengine.vertcdemo.interactivelive.bean.LiveResponse;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveRoomInfo;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveUserInfo;
 import com.volcengine.vertcdemo.interactivelive.bean.ReconnectInfo;
-import com.volcengine.vertcdemo.interactivelive.event.GiftEvent;
-import com.volcengine.vertcdemo.interactivelive.view.AddGuestsDialog;
-import com.volcengine.vertcdemo.interactivelive.view.AudienceGroupLayout;
-import com.volcengine.vertcdemo.interactivelive.view.AudienceSettingDialog;
-import com.volcengine.vertcdemo.interactivelive.view.AvatarView;
-import com.volcengine.vertcdemo.interactivelive.view.GiftDialog;
-import com.volcengine.vertcdemo.interactivelive.view.InviteResultDialog;
-import com.volcengine.vertcdemo.interactivelive.view.LiveCoHostDialog;
-import com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout;
-import com.volcengine.vertcdemo.interactivelive.view.LiveSettingDialog;
-import com.volcengine.vertcdemo.interactivelive.view.LiveVideoLayout;
-import com.volcengine.vertcdemo.interactivelive.view.RequestInteractDialog;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.core.LivePlayerManager;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
@@ -89,6 +81,7 @@ import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkPermitEvent;
 import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkReplyEvent;
 import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkStatusEvent;
 import com.volcengine.vertcdemo.interactivelive.event.AudienceMediaUpdateEvent;
+import com.volcengine.vertcdemo.interactivelive.event.GiftEvent;
 import com.volcengine.vertcdemo.interactivelive.event.InviteAudienceEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LinkMicStatusEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveFinishEvent;
@@ -102,16 +95,28 @@ import com.volcengine.vertcdemo.interactivelive.event.NetworkConnectEvent;
 import com.volcengine.vertcdemo.interactivelive.event.NetworkQualityEvent;
 import com.volcengine.vertcdemo.interactivelive.event.UpdatePullStreamEvent;
 import com.volcengine.vertcdemo.interactivelive.event.UserTemporaryLeaveEvent;
-import com.volcengine.vertcdemo.interactivelive.feature.createroom.effect.EffectDialog;
+import com.volcengine.vertcdemo.interactivelive.view.AddGuestsDialog;
+import com.volcengine.vertcdemo.interactivelive.view.AudienceGroupLayout;
+import com.volcengine.vertcdemo.interactivelive.view.AudienceSettingDialog;
+import com.volcengine.vertcdemo.interactivelive.view.AvatarView;
+import com.volcengine.vertcdemo.interactivelive.view.GiftDialog;
+import com.volcengine.vertcdemo.interactivelive.view.InviteResultDialog;
+import com.volcengine.vertcdemo.interactivelive.view.LiveCoHostDialog;
+import com.volcengine.vertcdemo.interactivelive.view.LiveRoomControlsLayout;
+import com.volcengine.vertcdemo.interactivelive.view.LiveSettingDialog;
+import com.volcengine.vertcdemo.interactivelive.view.LiveVideoView;
+import com.volcengine.vertcdemo.interactivelive.view.RequestInteractDialog;
+import com.volcengine.vertcdemo.utils.Utils;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -159,15 +164,17 @@ public class LiveRoomMainActivity extends BaseActivity {
     private LiveUserInfo mHostInfo; //自己不是主播时，主播的用户信息
     private LiveUserInfo mCoHostInfo; //自己是主播时，别的主播的用户信息
     private LiveRoomInfo mLiveRoomInfo; //房间信息
-    private final List<LiveUserInfo> mGuestList = new LinkedList<>();
+    private final List<LiveUserInfo> mGuestList = new ArrayList<>();
     private int mAudienceCount = 0;
     private final Map<String, String> mPullStreamMap = new HashMap<>();
 
     private AvatarView mAvatarView;
     private LiveRoomControlsLayout mLiveRoomControls;
     private TextView mAudienceCountTv;
-    private FrameLayout mLiveStreamContainer;
-    private LiveVideoLayout mLiveVideoLayout;
+    private FrameLayout mLiveStreamContainer; // 视频直播流渲染控件父布局
+    // 视频直播流渲染控件
+    private final TextureView mLiveStreamRenderView = new TextureView(Utilities.getApplicationContext());
+    private LiveVideoView mLiveVideoView; // RTC 流渲染控件
     private AudienceGroupLayout mGuestListLayout;
     private RecyclerView mLiveChatRv;
     private View mTopTip;
@@ -209,24 +216,6 @@ public class LiveRoomMainActivity extends BaseActivity {
                 }
             };
 
-    //邀请主播连线回调
-    private final IRequestCallback<LiveInviteResponse> mInviteHostResponse =
-            new IRequestCallback<LiveInviteResponse>() {
-                @Override
-                public void onSuccess(LiveInviteResponse data) {
-                    showToast("已发出邀请，等待对方应答");
-                }
-
-                @Override
-                public void onError(int errorCode, String message) {
-                    if (errorCode == 622) {
-                        showToast("已发出邀请，等待对方应答");
-                    } else {
-                        showToast(errorCodeToMessage(errorCode, message));
-                    }
-                }
-            };
-
     //响应邀请回调
     private final IRequestCallback<LiveInviteResponse> mAnchorReplyInviteCallback =
             new IRequestCallback<LiveInviteResponse>() {
@@ -244,7 +233,8 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                     LiveRTCManager.ins().startCaptureVideo(mSelfInfo.isCameraOn());
                     LiveRTCManager.ins().startCaptureAudio(mSelfInfo.isMicOn());
-                    mLiveVideoLayout.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+                    mLiveVideoView.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+                    setCoHostVideoConfig(mCoHostInfo);
 
                     LiveRTCManager.ins().startForwardStreamToRooms(data.rtcRoomId,
                             mCoHostInfo.userId, data.rtcToken, mRTCRoomId,
@@ -253,10 +243,9 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                 @Override
                 public void onError(int errorCode, String message) {
-                    showToast(errorCodeToMessage(errorCode, message));
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                 }
             };
-
 
     //观众申请连线回调
     private final IRequestCallback<LiveInviteResponse> mGuestApplyResponse =
@@ -274,7 +263,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                         showToast("您已向主播发起连麦申请，等待主播应答");
                     } else {
                         mLastApplyTs = 0;
-                        showToast(errorCodeToMessage(errorCode, message));
+                        showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                         SolutionDemoEventManager.post(new InviteAudienceEvent(
                                 SolutionDataManager.ins().getUserId(),
                                 LiveDataManager.INVITE_REPLY_TIMEOUT));
@@ -293,7 +282,7 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                 @Override
                 public void onError(int errorCode, String message) {
-                    showToast(errorCodeToMessage(errorCode, message));
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                 }
             };
 
@@ -339,15 +328,16 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                     mRoomStatus = ROOM_STATUS_GUEST_INTERACT;
                     mSelfInfo.status = USER_STATUS_AUDIENCE_INTERACTING;
-                    mSelfInfo.linkMicStatus = LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING;
-                    mLiveVideoLayout.setLiveUserInfo(mHostInfo, null);
+                    mSelfInfo.linkMicStatus = LINK_MIC_STATUS_AUDIENCE_INTERACTING;
+                    mLiveVideoView.setLiveUserInfo(mHostInfo, null);
                     mLiveRoomControls.setAddGuestBtnStatus(STATUS_DISABLE);
-                    mLiveRoomControls.setRole(mSelfInfo.role, LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING);
+                    mLiveRoomControls.setRole(mSelfInfo.role, LINK_MIC_STATUS_AUDIENCE_INTERACTING);
+                    updatePlayerStatus();
                 }
 
                 @Override
                 public void onError(int errorCode, String message) {
-                    showToast(errorCodeToMessage(errorCode, message));
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                 }
             };
 
@@ -381,7 +371,7 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                 @Override
                 public void onError(int errorCode, String message) {
-                    showToast(errorCodeToMessage(errorCode, message));
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                 }
             };
 
@@ -405,20 +395,7 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                 @Override
                 public void onError(int errorCode, String message) {
-                    showToast(errorCodeToMessage(errorCode, message));
-                }
-            };
-
-    private final IRequestCallback<LiveResponse> mLiveUpdateResolution =
-            new IRequestCallback<LiveResponse>() {
-                @Override
-                public void onSuccess(LiveResponse data) {
-
-                }
-
-                @Override
-                public void onError(int errorCode, String message) {
-
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                 }
             };
 
@@ -478,7 +455,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                 (int) Utilities.dip2Px(22), (int) Utilities.dip2Px(20));
         mAudienceCountTv.setCompoundDrawables(drawable, null, null, null);
         mLiveStreamContainer = findViewById(R.id.live_stream_container);
-        mLiveVideoLayout = findViewById(R.id.main_container);
+        mLiveVideoView = findViewById(R.id.main_container);
         mGuestListLayout = findViewById(R.id.audience_list_rv);
         mTopTip = findViewById(R.id.main_disconnect_tip);
 
@@ -529,7 +506,7 @@ public class LiveRoomMainActivity extends BaseActivity {
             if (TextUtils.isEmpty(roomId) || TextUtils.isEmpty(hostId)) {
                 return false;
             } else {
-                LiveRTCManager.ins().getRTMClient().requestJoinLiveRoom(roomId, mJoinRoomCallback);
+                LiveRTCManager.ins().getRTSClient().requestJoinLiveRoom(roomId, mJoinRoomCallback);
                 return true;
             }
         } else if (TextUtils.equals(refer, REFER_RECONNECT)) {
@@ -579,13 +556,18 @@ public class LiveRoomMainActivity extends BaseActivity {
     }
 
     @Override
+    protected void setupStatusBar() {
+        WindowUtils.setLayoutFullScreen(getWindow());
+    }
+
+    @Override
     public void onBackPressed() {
         openLeaveDialog();
     }
 
     @Override
-    public void finish() {
-        super.finish();
+    protected void onDestroy() {
+        super.onDestroy();
         SolutionDemoEventManager.unregister(this);
 
         if (mLiveRoomInfo == null || mSelfInfo == null) {
@@ -597,20 +579,24 @@ public class LiveRoomMainActivity extends BaseActivity {
                 showToast("主播已和你断开连线");
             }
             if (!isLeaveByKickOut) {
-                LiveRTCManager.ins().getRTMClient().requestLeaveLiveRoom(roomId, mLeaveLiveCallback);
+                LiveRTCManager.ins().getRTSClient().requestLeaveLiveRoom(roomId, mLeaveLiveCallback);
             }
         } else if (mSelfInfo.role == USER_ROLE_HOST) {
             if (mRoomStatus == ROOM_STATUS_GUEST_INTERACT) {
                 showToast("主播已断开连线");
             }
             if (!isLeaveByKickOut) {
-                LiveRTCManager.ins().getRTMClient().requestFinishLive(roomId, mFinishLiveCallback);
+                LiveRTCManager.ins().getRTSClient().requestFinishLive(roomId, mFinishLiveCallback);
             }
         }
 
-        LiveRTCManager.ins().leaveRTMRoom();
+        LiveRTCManager.ins().leaveRTSRoom();
         LiveRTCManager.ins().leaveRoom();
+        LiveRTCManager.ins().turnOnCamera(false);
+        LiveRTCManager.ins().turnOnMic(false);
         LivePlayerManager.ins().stopPull();
+        stopPlayLiveStream();
+        LiveRTCManager.ins().removeAllUserRenderView();
     }
 
     public void initByJoinResponse(LiveRoomInfo liveRoomInfo, LiveUserInfo liveUserInfo,
@@ -623,7 +609,7 @@ public class LiveRoomMainActivity extends BaseActivity {
             mPullStreamMap.putAll(pullStreamMap);
         }
 
-        LiveRTCManager.ins().joinRTMRoom(mLiveRoomInfo.roomId, mSelfInfo.userId, mRTMToken);
+        LiveRTCManager.ins().joinRTSRoom(mLiveRoomInfo.roomId, mSelfInfo.userId, mRTMToken);
         if (mSelfInfo.role != USER_ROLE_HOST) {
             LiveRTCManager.ins().startCaptureAudio(false);
             LiveRTCManager.ins().startCaptureVideo(false);
@@ -639,33 +625,33 @@ public class LiveRoomMainActivity extends BaseActivity {
             LiveRTCManager.ins().joinRoom(mRTCRoomId, mSelfInfo.userId, mRTCToken);
             if (mRoomStatus == ROOM_STATUS_CO_HOST) {
                 updateOnlineGuestList(null);
-                mLiveVideoLayout.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+                mLiveVideoView.setLiveUserInfo(mSelfInfo, mCoHostInfo);
             } else if (mRoomStatus == ROOM_STATUS_GUEST_INTERACT) {
-                mLiveVideoLayout.setLiveUserInfo(mSelfInfo, null);
+                mLiveVideoView.setLiveUserInfo(mSelfInfo, null);
                 updateOnlineGuestList();
             } else {
-                mLiveVideoLayout.setLiveUserInfo(liveUserInfo, null);
+                mLiveVideoView.setLiveUserInfo(liveUserInfo, null);
                 updateOnlineGuestList(null);
             }
 
-            LiveRTCManager.ins().getRTMClient().updateResolution(mLiveRoomInfo.roomId, LiveRTCManager.ins().getWidth(),
-                    LiveRTCManager.ins().getHeight(), mLiveUpdateResolution);
+            LiveRTCManager.ins().getRTSClient().updateResolution(
+                    mLiveRoomInfo.roomId,
+                    LiveRTCManager.ins().getWidth(LiveDataManager.USER_ROLE_HOST),
+                    LiveRTCManager.ins().getHeight(LiveDataManager.USER_ROLE_HOST),
+                    null);
         } else {
-            if (mHostInfo.isCameraOn()) {
-                playLiveStream(true);
-            } else {
-                mLiveVideoLayout.setLiveUserInfo(mHostInfo, null);
-                stopPlayLiveStream();
-            }
+            mLiveVideoView.setLiveUserInfo(mHostInfo, null);
+            updatePlayerStatus();
+
             // 观众端进房时需要调整色块遮罩
             addOrRemoveBlock(liveRoomInfo != null && (mHostInfo.linkMicStatus == LINK_MIC_STATUS_HOST_INTERACTING));
             updateOnlineGuestList(null);
             mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
-            mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
-
-            //观众永远都是256 * 256
-            LiveRTCManager.ins().setResolution(256, 256);
         }
+
+        LiveRTCManager.ins().setResolution(liveUserInfo.role,
+                LiveRTCManager.ins().getWidth(liveUserInfo.role),
+                LiveRTCManager.ins().getHeight(liveUserInfo.role));
     }
 
     private void setAudienceCount(int count) {
@@ -674,13 +660,14 @@ public class LiveRoomMainActivity extends BaseActivity {
     }
 
     private void openFinishCoHostDialog() {
-        final CommonDialog dialog = new CommonDialog(this);
+        final SolutionCommonDialog dialog = new SolutionCommonDialog(this);
         dialog.setCancelable(true);
-        dialog.setMessage("确认断开连线");
+        dialog.setPositiveBtnText(R.string.live_interact_finish_co_host);
+        dialog.setMessage("确定断开连线？");
         dialog.setNegativeListener((v) -> dialog.dismiss());
         dialog.setPositiveListener((v) -> {
             dialog.dismiss();
-            LiveRTCManager.ins().getRTMClient().finishHostLink(mLinkId, mLiveRoomInfo.roomId, mInteractResponse);
+            LiveRTCManager.ins().getRTSClient().finishHostLink(mLinkId, mLiveRoomInfo.roomId, mInteractResponse);
         });
         dialog.show();
     }
@@ -690,9 +677,28 @@ public class LiveRoomMainActivity extends BaseActivity {
             showToast("观众连线中，无法发起主播连线");
             return;
         }
-        LiveCoHostDialog liveCoHostDialog = new LiveCoHostDialog(this, info ->
-                LiveRTCManager.ins().getRTMClient().inviteHostByHost(mLiveRoomInfo.roomId, mLiveRoomInfo.anchorUserId,
-                        info.roomId, info.userId, "", mInviteHostResponse));
+        LiveCoHostDialog liveCoHostDialog = new LiveCoHostDialog(this, new LiveCoHostDialog.CoHostCallback() {
+            @Override
+            public void onClick(LiveUserInfo info) {
+                final IRequestCallback<LiveInviteResponse> callback = new IRequestCallback<LiveInviteResponse>() {
+                    @Override
+                    public void onSuccess(LiveInviteResponse data) {
+                        showToast(String.format("已向%s发出连麦邀请，等待对方应答", info.userName));
+                    }
+
+                    @Override
+                    public void onError(int errorCode, String message) {
+                        if (errorCode == 622) {
+                            showToast(String.format("已向%s发出连麦邀请，等待对方应答", info.userName));
+                        } else {
+                            showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
+                        }
+                    }
+                };
+                LiveRTCManager.ins().getRTSClient().inviteHostByHost(mLiveRoomInfo.roomId, mLiveRoomInfo.anchorUserId,
+                        info.roomId, info.userId, "", callback);
+            }
+        });
         liveCoHostDialog.show();
     }
 
@@ -705,25 +711,27 @@ public class LiveRoomMainActivity extends BaseActivity {
         }
         if (mSelfInfo.role == USER_ROLE_AUDIENCE) {
             if (mSelfInfo.linkMicStatus == LiveDataManager.LINK_MIC_STATUS_OTHER) {
-                if (mRoomStatus == ROOM_STATUS_CO_HOST) {
-                    SolutionToast.show("主播连线中，无法发起观众连线");
+                boolean isHostInCoHost = mHostInfo != null
+                        && mHostInfo.linkMicStatus == LINK_MIC_STATUS_HOST_INTERACTING;
+                if (mRoomStatus == ROOM_STATUS_CO_HOST || isHostInCoHost) {
+                    SolutionToast.show("主播正在发起双主播连线");
                     return;
                 }
                 RequestInteractDialog dialog = new RequestInteractDialog(
                         LiveRoomMainActivity.this, mLastApplyTs,
                         () -> {
-                            LiveRTCManager.ins().getRTMClient().requestLinkByAudience(mLiveRoomInfo.roomId, mGuestApplyResponse);
+                            LiveRTCManager.ins().getRTSClient().requestLinkByAudience(mLiveRoomInfo.roomId, mGuestApplyResponse);
                             mLiveRoomControls.setAddGuestBtnStatus(LiveRoomControlsLayout.STATUS_NORMAL);
                         });
                 dialog.show();
-            } else if (mSelfInfo.linkMicStatus == LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING) {
+            } else if (mSelfInfo.linkMicStatus == LINK_MIC_STATUS_AUDIENCE_INTERACTING) {
                 final CommonDialog dialog = new CommonDialog(this);
                 dialog.setCancelable(true);
                 dialog.setMessage("是否与主播断开连接");
                 dialog.setNegativeListener((v) -> dialog.dismiss());
                 dialog.setPositiveListener((v) -> {
                     dialog.dismiss();
-                    LiveRTCManager.ins().getRTMClient().finishAudienceLinkByAudience("",
+                    LiveRTCManager.ins().getRTSClient().finishAudienceLinkByAudience("",
                             mLiveRoomInfo.roomId, mInteractResponse);
                 });
                 dialog.show();
@@ -739,14 +747,18 @@ public class LiveRoomMainActivity extends BaseActivity {
         }
     }
 
+    /**
+     * 自己作为主播邀请观众上麦
+     * @param info 观众用户信息
+     */
     private void inviteAudienceByHost(LiveUserInfo info) {
         if (info == null) {
             return;
         }
-        IRequestCallback<LiveInviteResponse> callback = new IRequestCallback<LiveInviteResponse>() {
+        final IRequestCallback<LiveInviteResponse> callback = new IRequestCallback<LiveInviteResponse>() {
             @Override
             public void onSuccess(LiveInviteResponse data) {
-                showToast("已发出邀请，等待对方应答");
+                showToast(String.format("已向%s发出连麦邀请，等待对方应答", info.userName));
                 SolutionDemoEventManager.post(new InviteAudienceEvent(info.userId,
                         LiveDataManager.INVITE_REPLY_WAITING));
             }
@@ -754,25 +766,24 @@ public class LiveRoomMainActivity extends BaseActivity {
             @Override
             public void onError(int errorCode, String message) {
                 if (errorCode == 622) {
-                    showToast("已发出邀请，等待对方应答");
+                    showToast(String.format("已向%s发出连麦邀请，等待对方应答", info.userName));
                 } else {
-                    SolutionToast.show(errorCodeToMessage(errorCode, message));
+                    showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                     SolutionDemoEventManager.post(new InviteAudienceEvent(info.userId,
                             LiveDataManager.INVITE_REPLY_TIMEOUT));
                 }
             }
         };
-        LiveRTCManager.ins().getRTMClient().inviteAudienceByHost(mLiveRoomInfo.roomId,
+        LiveRTCManager.ins().getRTSClient().inviteAudienceByHost(mLiveRoomInfo.roomId,
                 mLiveRoomInfo.anchorUserId, mLiveRoomInfo.roomId, info.userId, "", callback);
     }
 
     private void openVideoEffectDialog() {
-        new EffectDialog(this).show();
+        LiveRTCManager.ins().openEffectDialog(this);
     }
 
     private void openSettingDialog() {
         if (mLiveRoomInfo == null || mSelfInfo == null) {
-            showToast("");
             return;
         }
         if (mSelfInfo.role == USER_ROLE_HOST) {
@@ -791,61 +802,19 @@ public class LiveRoomMainActivity extends BaseActivity {
             return;
         }
         if (mSelfInfo.role == USER_ROLE_HOST) {
-            final CommonDialog dialog = new CommonDialog(this);
+            final SolutionCommonDialog dialog = new SolutionCommonDialog(this);
             dialog.setCancelable(true);
-            dialog.setMessage("确认结束直播");
+            dialog.setMessage("确认结束直播？");
+            dialog.setPositiveBtnText(R.string.live_interact_finish_live);
             dialog.setNegativeListener((v) -> dialog.dismiss());
-            dialog.setPositiveListener((v) -> finish());
+            dialog.setPositiveListener((v) -> {
+                dialog.cancel();
+                finish();
+            });
             dialog.show();
         } else {
             finish();
         }
-    }
-
-    private String errorCodeToMessage(int code, String originMessage) {
-        String message;
-        switch (code) {
-            case 401:
-                message = "主播邀请中，无法发起连线";
-                break;
-            case 402:
-                message = "主播连线中，无法发起连线";
-                break;
-            case 481:
-                message = "主播邀请中，无法发起连麦";
-                break;
-            case 482:
-                message = "当前申请人数已达上限";
-                break;
-            case 472:
-            case 483:
-                message = "当前麦位已满";
-                break;
-            case 611:
-                message = "连麦已过期";
-                break;
-            case 630:
-                message = "主播正在连线中";
-                break;
-            case 632:
-            case 642:
-                message = "主播正在发起双主播连线";
-                break;
-            case 638:
-            case 645:
-                message = "正在等待被邀主播的应答";
-                break;
-            case 643:
-                message = "与观众连线中，无法发起主播连线";
-                break;
-            case 634:
-            case 644:
-                message = "主播连线中";
-                break;
-            default:
-                message = originMessage;
-        }
-        return message;
     }
 
     private void showToast(String message) {
@@ -857,38 +826,76 @@ public class LiveRoomMainActivity extends BaseActivity {
         mLiveChatRv.post(() -> mLiveChatRv.smoothScrollToPosition(mLiveChatAdapter.getItemCount()));
     }
 
-    private void playLiveStream() {
-        playLiveStream(true);
+    /**
+     * 更新播放器状态
+     * 如果自己是主播，或者自己是嘉宾在和主播连麦，则显示连麦控件，并停止拉流
+     * 否则，如果单主播直播且摄像头关闭时，显示连麦控件，并开始拉流
+     */
+    private void updatePlayerStatus() {
+        if (mSelfInfo.role == USER_ROLE_HOST ||
+                mSelfInfo.linkMicStatus == LINK_MIC_STATUS_AUDIENCE_INTERACTING) {
+            mLiveVideoView.setVisibility(VISIBLE);
+            stopPlayLiveStream();
+        } else {
+            boolean isSingleCameraOff = !mHostInfo.isCameraOn()
+                    && (mHostInfo.linkMicStatus != LINK_MIC_STATUS_HOST_INTERACTING);
+            mLiveVideoView.setVisibility(
+                    isSingleCameraOff
+                    ? VISIBLE : GONE);
+            playLiveStream();
+            mLiveStreamContainer.setVisibility(isSingleCameraOff ? INVISIBLE : VISIBLE);
+        }
     }
 
-    private void playLiveStream(boolean forceUpdate) {
+    /**
+     * 播放直播 rtmp 直播流
+     */
+    private void playLiveStream() {
         if (mPullStreamMap.isEmpty()) {
             Log.d(TAG, "playLiveStream: pullStream map is empty");
             return;
         }
-        mLiveVideoLayout.setVisibility(View.GONE);
-        if (forceUpdate) {
-            mLiveStreamContainer.removeAllViews();
-            TextureView renderView = LivePlayerManager.ins().getPlayView();
-            Utilities.removeFromParent(renderView);
-            int height = WindowUtils.getScreenWidth(this) * 16 / 9;
-            int y = (WindowUtils.getScreenHeight(this) - height) / 2;
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, height);
-            params.topMargin = y;
 
-            mLiveStreamContainer.addView(renderView, params);
-        }
+        TextureView renderView = LivePlayerManager.ins().getPlayView();
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(0, 0);
+        calculatePlayerSize(params, mLiveStreamContainer.getWidth(),
+                mLiveStreamContainer.getHeight());
+
+        Utils.attachViewToViewGroup(mLiveStreamContainer, renderView, params);
 
         String url = mPullStreamMap.get(LiveRTCManager.ins().getPlayLiveStreamResolution());
         Log.d(TAG, "playLiveStream: play: " + url);
         LivePlayerManager.ins().playLive(url);
     }
 
+    /**
+     * 以 hidden 模式设置布局参数，同时保证画布是9：16
+     * @param params 布局参数对象
+     * @param containerWidth 容器的宽
+     * @param containerHeight 容器的高
+     */
+    private void calculatePlayerSize(FrameLayout.LayoutParams params,
+                                     int containerWidth, int containerHeight) {
+        float expectHeight = ((float) containerWidth) * 16 / 9;
+        if (expectHeight > containerHeight) {
+            params.width = containerWidth;
+            params.height = (int) expectHeight;
+
+            float yDelta = (containerHeight - expectHeight) / 2;
+            params.topMargin = (int) yDelta;
+        } else {
+            float expectWidth = ((float) containerHeight) * 9 / 16;
+            params.height = containerHeight;
+            params.width = (int) expectWidth;
+
+            params.leftMargin = (containerWidth - (int) expectWidth) / 2;
+        }
+    }
+
     private void stopPlayLiveStream() {
         mLiveStreamContainer.removeAllViews();
         LivePlayerManager.ins().stopPull();
-        mLiveVideoLayout.setVisibility(View.VISIBLE);
     }
 
     private void updateOnlineGuestList() {
@@ -903,6 +910,12 @@ public class LiveRoomMainActivity extends BaseActivity {
      */
     private void updateOnlineGuestList(List<LiveUserInfo> userList) {
         mGuestList.clear();
+
+        // 如果自己不是主播，先重置自己的状态，因为后面的遍历可能执行不到
+        if (mSelfInfo.role != USER_ROLE_HOST) {
+            mSelfInfo.status = USER_STATUS_OTHER;
+        }
+
         if (userList != null) {
             for (LiveUserInfo userInfo : userList) {
                 if (!TextUtils.equals(userInfo.userId, mLiveRoomInfo.anchorUserId)) {
@@ -921,7 +934,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                         mSelfInfo.linkMicStatus = LINK_MIC_STATUS_HOST_INTERACTING;
                     } else {
                         mSelfInfo.status = USER_STATUS_AUDIENCE_INTERACTING;
-                        mSelfInfo.linkMicStatus = LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING;
+                        mSelfInfo.linkMicStatus = LINK_MIC_STATUS_AUDIENCE_INTERACTING;
                     }
                 }
             }
@@ -944,6 +957,8 @@ public class LiveRoomMainActivity extends BaseActivity {
      * @param add 添加
      */
     private void addOrRemoveBlock(boolean add) {
+        // 暂时去掉这个逻辑
+        /*
         int childViewCount = mLiveStreamContainer.getChildCount();
         if (add && childViewCount == 1) {
             int height = WindowUtils.getScreenWidth(this) * 16 / 9;
@@ -961,7 +976,7 @@ public class LiveRoomMainActivity extends BaseActivity {
             bottomParams.topMargin = mLiveStreamContainer.getHeight() - blockHeight;
             mLiveStreamContainer.addView(bottomView, bottomParams);
         } else if (!add && childViewCount != 1) {
-            LinkedList<View> removingViews = new LinkedList<>();
+            ArrayList<View> removingViews = new ArrayList<>();
             for (int i = 0; i < mLiveStreamContainer.getChildCount(); i++) {
                 View view = mLiveStreamContainer.getChildAt(i);
                 if (view instanceof SurfaceView || view instanceof TextureView) {
@@ -973,6 +988,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                 mLiveStreamContainer.removeView(view);
             }
         }
+         */
     }
 
     private List<String> sortUserList(List<LiveUserInfo> userInfos) {
@@ -1055,7 +1071,7 @@ public class LiveRoomMainActivity extends BaseActivity {
         }
         int mic = LiveRTCManager.ins().isMicOn() ? MEDIA_STATUS_ON : MEDIA_STATUS_OFF;
         int camera = LiveRTCManager.ins().isCameraOn() ? MEDIA_STATUS_ON : MEDIA_STATUS_OFF;
-        LiveRTCManager.ins().getRTMClient().updateMediaStatus(event.guestRoomId, mic, camera,
+        LiveRTCManager.ins().getRTSClient().updateMediaStatus(event.guestRoomId, mic, camera,
                 new IRequestCallback<LiveResponse>() {
                     @Override
                     public void onSuccess(LiveResponse data) {
@@ -1064,7 +1080,7 @@ public class LiveRoomMainActivity extends BaseActivity {
 
                     @Override
                     public void onError(int errorCode, String message) {
-                        showToast(errorCodeToMessage(errorCode, message));
+                        showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
                     }
                 });
     }
@@ -1077,11 +1093,11 @@ public class LiveRoomMainActivity extends BaseActivity {
                 if (mCoHostInfo != null && TextUtils.equals(event.userId, mCoHostInfo.userId)) {
                     mCoHostInfo.micStatus = event.mic;
                     mCoHostInfo.cameraStatus = event.camera;
-                    mLiveVideoLayout.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+                    mLiveVideoView.setLiveUserInfo(mSelfInfo, mCoHostInfo);
                 } else if (TextUtils.equals(event.userId, mSelfInfo.userId)) {
                     mSelfInfo.micStatus = event.mic;
                     mSelfInfo.cameraStatus = event.camera;
-                    mLiveVideoLayout.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+                    mLiveVideoView.setLiveUserInfo(mSelfInfo, mCoHostInfo);
                 }
             } else {
                 if (TextUtils.equals(event.userId, mSelfInfo.userId)) {
@@ -1089,7 +1105,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                     mSelfInfo.cameraStatus = event.camera;
                     LiveRTCManager.ins().startCaptureAudio(event.mic == MEDIA_STATUS_ON);
                     LiveRTCManager.ins().startCaptureVideo(event.camera == MEDIA_STATUS_ON);
-                    mLiveVideoLayout.setLiveUserInfo(mSelfInfo, null);
+                    mLiveVideoView.setLiveUserInfo(mSelfInfo, null);
                 }
                 if (mRoomStatus == ROOM_STATUS_GUEST_INTERACT) {
                     for (LiveUserInfo userInfo : mGuestList) {
@@ -1103,6 +1119,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                 }
             }
         } else {
+            // 非主播连麦情况
             boolean isSelfInteract = false;
             for (LiveUserInfo userInfo : mGuestList) {
                 if (TextUtils.equals(userInfo.userId, mSelfInfo.userId)) {
@@ -1111,15 +1128,10 @@ public class LiveRoomMainActivity extends BaseActivity {
                 }
             }
             if (mHostInfo != null && TextUtils.equals(event.userId, mHostInfo.userId)) {
-                if (event.camera == LiveDataManager.MEDIA_STATUS_ON && !isSelfInteract) {
-                    // 只有当主播摄像头上次是关闭，且本次打开的情况下，触发拉流控件的强制刷新
-                    playLiveStream(!mHostInfo.isCameraOn());
-                } else {
-                    stopPlayLiveStream();
-                }
                 mHostInfo.micStatus = event.mic;
                 mHostInfo.cameraStatus = event.camera;
-                mLiveVideoLayout.setLiveUserInfo(mHostInfo, null);
+                mLiveVideoView.setLiveUserInfo(mHostInfo, null);
+                updatePlayerStatus();
             }
             if (mRoomStatus == ROOM_STATUS_GUEST_INTERACT) {
                 for (LiveUserInfo userInfo : mGuestList) {
@@ -1151,9 +1163,7 @@ public class LiveRoomMainActivity extends BaseActivity {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onUpdatePullStreamEvent(UpdatePullStreamEvent event) {
         //TT拉流失败问题解决
-        if (mSelfInfo.role == USER_ROLE_AUDIENCE) {
-            playLiveStream(false);
-        }
+        updatePlayerStatus();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -1166,7 +1176,7 @@ public class LiveRoomMainActivity extends BaseActivity {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onSocketConnectEvent(SocketConnectEvent event) {
         if (event.status == SocketConnectEvent.ConnectStatus.RECONNECTED) {
-            LiveRTCManager.ins().getRTMClient().requestLiveReconnect(mLiveReconnectCallback);
+            LiveRTCManager.ins().getRTSClient().requestLiveReconnect(mLiveReconnectCallback);
         }
         if (event.status == SocketConnectEvent.ConnectStatus.DISCONNECTED
                 || event.status == SocketConnectEvent.ConnectStatus.CONNECTING) {
@@ -1189,13 +1199,14 @@ public class LiveRoomMainActivity extends BaseActivity {
     public void onNetworkQualityEvent(NetworkQualityEvent event) {
         boolean isGood = event.quality == NETWORK_QUALITY_EXCELLENT
                 || event.quality == NETWORK_QUALITY_GOOD;
-        mLiveVideoLayout.updateNetStatus(event.userId, isGood);
+        mLiveVideoView.updateNetStatus(event.userId, isGood);
         mGuestListLayout.updateNetStatus(event.userId, isGood);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onLinkMicStatusEvent(LinkMicStatusEvent event) {
         mRoomStatus = event.linkMicStatus;
+        mHostInfo.linkMicStatus = event.linkMicStatus;
         // 不是主播，需要调整遮罩位置
         if (mSelfInfo.role != USER_ROLE_HOST) {
             if (mRoomStatus == LINK_MIC_STATUS_OTHER) {
@@ -1204,16 +1215,17 @@ public class LiveRoomMainActivity extends BaseActivity {
                 addOrRemoveBlock(true);
             }
         }
+        updatePlayerStatus();
     }
 
     // 观众连麦 观众端 主播邀请观众上麦通知
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onAudienceLinkInviteEvent(AudienceLinkInviteEvent event) {
-        final CommonDialog dialog = new InviteResultDialog(this);
+        final InviteResultDialog dialog = new InviteResultDialog(this);
         dialog.setCancelable(true);
         dialog.setMessage("是否接受主播的连麦邀请");
         dialog.setNegativeListener((v) -> {
-            LiveRTCManager.ins().getRTMClient().replyHostInviterByAudience(event.linkerId, mLiveRoomInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyHostInviterByAudience(event.linkerId, mLiveRoomInfo.roomId,
                     LiveDataManager.LIVE_PERMIT_TYPE_REJECT, new IRequestCallback<LiveReplyResponse>() {
                         @Override
                         public void onSuccess(LiveReplyResponse data) {
@@ -1228,7 +1240,7 @@ public class LiveRoomMainActivity extends BaseActivity {
             dialog.dismiss();
         });
         dialog.setPositiveListener((v) -> {
-            LiveRTCManager.ins().getRTMClient().replyHostInviterByAudience(event.linkerId, mLiveRoomInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyHostInviterByAudience(event.linkerId, mLiveRoomInfo.roomId,
                     LiveDataManager.LIVE_PERMIT_TYPE_ACCEPT, mReplyInviteCallbackByAudience);
             dialog.dismiss();
         });
@@ -1238,11 +1250,11 @@ public class LiveRoomMainActivity extends BaseActivity {
     // 观众连麦 主播端 观众向主播申请上麦通知
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onAudienceLinkApplyEvent(AudienceLinkApplyEvent event) {
-        final CommonDialog dialog = new InviteResultDialog(this);
+        final InviteResultDialog dialog = new InviteResultDialog(this);
         dialog.setCancelable(true);
         dialog.setMessage(String.format("观众%s向你发来连线邀请", event.applicant.userName));
         dialog.setNegativeListener((v) -> {
-            LiveRTCManager.ins().getRTMClient().replyAudienceRequestByHost(event.linkerId, mLiveRoomInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyAudienceRequestByHost(event.linkerId, mLiveRoomInfo.roomId,
                     mLiveRoomInfo.anchorUserId, mLiveRoomInfo.roomId, event.applicant.userId,
                     LiveDataManager.LIVE_PERMIT_TYPE_REJECT, new IRequestCallback<LiveAnchorPermitAudienceResponse>() {
                         @Override
@@ -1258,7 +1270,7 @@ public class LiveRoomMainActivity extends BaseActivity {
             dialog.dismiss();
         });
         dialog.setPositiveListener((v) -> {
-            LiveRTCManager.ins().getRTMClient().replyAudienceRequestByHost(event.linkerId, mLiveRoomInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyAudienceRequestByHost(event.linkerId, mLiveRoomInfo.roomId,
                     mLiveRoomInfo.anchorUserId, mLiveRoomInfo.roomId, event.applicant.userId,
                     LiveDataManager.LIVE_PERMIT_TYPE_ACCEPT, mReplyInviteCallbackByHost);
             dialog.dismiss();
@@ -1294,14 +1306,13 @@ public class LiveRoomMainActivity extends BaseActivity {
     public void onAudienceLinkPermitEvent(AudienceLinkPermitEvent event) {
         mLastApplyTs = 0;
         if (event.permitType == LIVE_PERMIT_TYPE_REJECT) {
-            showToast("主播暂时有点事，拒绝了你的邀请");
+            showToast("主播拒绝和你连线");
             mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
             SolutionDemoEventManager.post(new InviteAudienceEvent(
                     SolutionDataManager.ins().getUserId(),
                     LiveDataManager.INVITE_REPLY_REJECT));
         } else if (event.permitType == LIVE_PERMIT_TYPE_ACCEPT) {
             showToast("主播接受了您的连麦申请，即将开始连麦");
-            stopPlayLiveStream();
 
             SolutionDemoEventManager.post(new InviteAudienceEvent(
                     SolutionDataManager.ins().getUserId(),
@@ -1314,21 +1325,22 @@ public class LiveRoomMainActivity extends BaseActivity {
 
             mRoomStatus = ROOM_STATUS_GUEST_INTERACT;
             mSelfInfo.status = USER_STATUS_AUDIENCE_INTERACTING;
-            mSelfInfo.linkMicStatus = LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING;
-            mLiveVideoLayout.setLiveUserInfo(mHostInfo, null);
+            mSelfInfo.linkMicStatus = LINK_MIC_STATUS_AUDIENCE_INTERACTING;
+            updatePlayerStatus();
             mLiveRoomControls.setAddGuestBtnStatus(STATUS_DISABLE);
-            mLiveRoomControls.setRole(mSelfInfo.role, LiveDataManager.LINK_MIC_STATUS_AUDIENCE_INTERACTING);
+            mLiveRoomControls.setRole(mSelfInfo.role, LINK_MIC_STATUS_AUDIENCE_INTERACTING);
         }
     }
 
     // 主播连麦 主播端 收到主播连麦邀请
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onAnchorLinkInviteEvent(AnchorLinkInviteEvent event) {
-        final CommonDialog dialog = new InviteResultDialog(this);
+        final InviteResultDialog dialog = new InviteResultDialog(this);
         dialog.setCancelable(true);
+        dialog.setPositiveBtnText(R.string.live_interact_accept_co_host);
         dialog.setMessage(String.format("%s邀请你进行主播连线，是否接受", event.userInfo.userName));
         dialog.setNegativeListener((v) -> {
-            LiveRTCManager.ins().getRTMClient().replyHostInviteeByHost(event.linkerId, event.userInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyHostInviteeByHost(event.linkerId, event.userInfo.roomId,
                     event.userInfo.userId, mLiveRoomInfo.roomId, mLiveRoomInfo.anchorUserId,
                     LiveDataManager.LIVE_PERMIT_TYPE_REJECT, new IRequestCallback<LiveInviteResponse>() {
                         @Override
@@ -1345,7 +1357,7 @@ public class LiveRoomMainActivity extends BaseActivity {
         });
         dialog.setPositiveListener((v) -> {
             mLinkId = event.linkerId;
-            LiveRTCManager.ins().getRTMClient().replyHostInviteeByHost(event.linkerId, event.userInfo.roomId,
+            LiveRTCManager.ins().getRTSClient().replyHostInviteeByHost(event.linkerId, event.userInfo.roomId,
                     event.userInfo.userId, mLiveRoomInfo.roomId, mLiveRoomInfo.anchorUserId,
                     LiveDataManager.LIVE_PERMIT_TYPE_ACCEPT, mAnchorReplyInviteCallback);
             dialog.dismiss();
@@ -1370,10 +1382,32 @@ public class LiveRoomMainActivity extends BaseActivity {
                 }
             }
             mLiveRoomControls.setCoHostBtnStatus(STATUS_DISABLE);
-            mLiveVideoLayout.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+            mLiveVideoView.setLiveUserInfo(mSelfInfo, mCoHostInfo);
+            setCoHostVideoConfig(mCoHostInfo);
             LiveRTCManager.ins().startForwardStreamToRooms(event.rtcRoomId, mCoHostInfo.userId,
                     event.rtcToken, mRTCRoomId, mSelfInfo.userId, mPushUrl);
         }
+    }
+
+    /**
+     * 根据业务服务器用户信息的额外字段设置连麦主播的分辨率信息
+     * @param userInfo 主播信息
+     */
+    private void setCoHostVideoConfig(LiveUserInfo userInfo) {
+        if (userInfo == null) {
+            return;
+        }
+        int width = 0;
+        int height = 0;
+        try {
+            JSONObject ext = new JSONObject(mCoHostInfo.extra);
+            width = ext.getInt("width");
+            height = ext.getInt("height");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        LiveRTCManager.ins().setCoHostVideoConfig(width, height);
     }
 
     // 观众连麦 观众加入或离开
@@ -1429,7 +1463,7 @@ public class LiveRoomMainActivity extends BaseActivity {
                     mLiveRoomControls.setRole(mSelfInfo.role, LiveDataManager.LINK_MIC_STATUS_OTHER);
                     mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
                     mSelfInfo.linkMicStatus = LiveDataManager.LINK_MIC_STATUS_OTHER;
-                    playLiveStream(true);
+                    updatePlayerStatus();
                     updateOnlineGuestList(null);
                     LiveRTCManager.ins().leaveRoom();
                 }
@@ -1467,12 +1501,10 @@ public class LiveRoomMainActivity extends BaseActivity {
             mLiveRoomControls.setRole(mSelfInfo.role, LiveDataManager.LINK_MIC_STATUS_OTHER);
             mLiveRoomControls.setCoHostBtnStatus(STATUS_NORMAL);
             updateOnlineGuestList(null);
-            if (mHostInfo.isCameraOn()) {
-                playLiveStream(true);
-            } else {
-                stopPlayLiveStream();
-                mLiveVideoLayout.setLiveUserInfo(mHostInfo, null);
-            }
+
+            mLiveVideoView.setLiveUserInfo(mHostInfo, null);
+            updatePlayerStatus();
+
             mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
             mLiveRoomControls.setCoHostBtnStatus(STATUS_NORMAL);
         }
@@ -1483,11 +1515,12 @@ public class LiveRoomMainActivity extends BaseActivity {
     public void onAnchorLinkFinishEvent(AnchorLinkFinishEvent event) {
         mRoomStatus = ROOM_STATUS_LIVE;
         showToast("主播已断开连线");
+        LiveRTCManager.ins().setCoHostVideoConfig(0 , 0);
         LiveRTCManager.ins().updateLiveTranscodingWithHost(false, mPushUrl,
                 mRTCRoomId, mSelfInfo.userId, null, null);
         LiveRTCManager.ins().stopLiveTranscodingWithHost();
         updateOnlineGuestList(null);
-        mLiveVideoLayout.setLiveUserInfo(mSelfInfo, null);
+        mLiveVideoView.setLiveUserInfo(mSelfInfo, null);
         mLiveRoomControls.setRole(USER_ROLE_HOST, LiveDataManager.LINK_MIC_STATUS_OTHER);
         mLiveRoomControls.setAddGuestBtnStatus(STATUS_NORMAL);
         mLiveRoomControls.setCoHostBtnStatus(STATUS_NORMAL);

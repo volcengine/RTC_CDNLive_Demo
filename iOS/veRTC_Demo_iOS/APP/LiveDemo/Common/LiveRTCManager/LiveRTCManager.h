@@ -2,8 +2,8 @@
 //  LiveRTCManager.h
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/10/24.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/10/24.
+//  
 //
 
 #import "LiveUserModel.h"
@@ -122,20 +122,11 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
  */
 - (void)stopCapture;
 
-/*
- * Update resolution
- */
-- (void)updateRes:(CGSize)size;
 
-/*
- * Update frame rate
- */
-- (void)updateFPS:(CGFloat)fps;
-
-/*
- * Update bit rate
- */
-- (void)updateKBitrate:(NSInteger)kbitrate min:(NSInteger)min max:(NSInteger)max;
+- (void)updateVideoEncoderRes:(CGSize)size;
+- (void)updateLiveTranscodingRes:(CGSize)size;
+- (void)updateLiveTranscodingFPS:(CGFloat)fps;
+- (void)updateLiveTranscodingKBitrate:(NSInteger)kbitrate;
 
 #pragma mark - Pull
 
@@ -143,7 +134,13 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
  * Start playing CDN audio and video stream
  */
 - (void)startPlayWithUrl:(NSString *)urlStr
-               superView:(UIView *)superView;
+               superView:(UIView *)superView
+                SEIBlcok:(void (^)(NSDictionary *SEIDic))SEIBlcok;
+
+/*
+ * Whether the current player supports parsing SEI
+ */
+- (BOOL)isSupportSEI;
 
 /*
  * Update pull stream scale mode
@@ -195,6 +192,11 @@ typedef NS_ENUM(NSUInteger, RTCMixStatus) {
  * Bing rendered view
  */
 - (void)bingCanvasViewToUid:(NSString *)uid;
+
+/*
+ * Remove rendered view
+ */
+- (void)removeCanvasLocalUid;
 
 @end
 

@@ -33,6 +33,6 @@
         android:singleLine="true"
         android:textColor="@color/white"
         android:textSize="14sp"
-        tools:text="BytedanceBytedanceBytedance" />
+        tools:text="Hello World!Hello World!Hello World!" />
 
 </LinearLayout>

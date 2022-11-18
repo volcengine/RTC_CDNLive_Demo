@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.ss.video.rtc.demo.basic_module.ui.CommonDialog;
 import com.volcengine.vertcdemo.common.BaseDialog;
+import com.volcengine.vertcdemo.common.SolutionCommonDialog;
 import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
 import com.volcengine.vertcdemo.core.net.IRequestCallback;
 import com.volcengine.vertcdemo.interactivelive.R;
@@ -32,11 +33,12 @@ import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkReplyEvent;
 import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkStatusEvent;
 import com.volcengine.vertcdemo.interactivelive.event.InviteAudienceEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveRoomUserEvent;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class AddGuestsDialog extends BaseDialog {
@@ -82,7 +84,7 @@ public class AddGuestsDialog extends BaseDialog {
         mAdapter = new GuestListAdapter(mAddGuestClickListener);
         mListView.setAdapter(mAdapter);
         mCloseAll = findViewById(R.id.dialog_audience_list_close_all);
-        mCloseAll.setOnClickListener((v) -> openCloseAllGuestInteractDialog());
+        mCloseAll.setOnClickListener(DebounceClickListener.create(v -> openCloseAllGuestInteractDialog()));
         initData();
     }
 
@@ -99,7 +101,7 @@ public class AddGuestsDialog extends BaseDialog {
     }
 
     private void initData() {
-        LiveRTCManager.ins().getRTMClient().requestAudienceList(mRoomId, mRequestAudienceList);
+        LiveRTCManager.ins().getRTSClient().requestAudienceList(mRoomId, mRequestAudienceList);
     }
 
     public void setAddGuestList(List<LiveUserInfo> infoList) {
@@ -125,13 +127,14 @@ public class AddGuestsDialog extends BaseDialog {
 
     @SuppressLint("DefaultLocale")
     private void openCloseAllGuestInteractDialog() {
-        final CommonDialog dialog = new CommonDialog(getContext());
+        final SolutionCommonDialog dialog = new SolutionCommonDialog(getContext());
         dialog.setCancelable(true);
+        dialog.setPositiveBtnText(R.string.live_interact_close);
         dialog.setMessage(String.format("正在与%d位观众连线，是否确认关闭观众连线？", getInteractUserCount()));
         dialog.setNegativeListener((v) -> dialog.dismiss());
         dialog.setPositiveListener((v) -> {
             dialog.dismiss();
-            LiveRTCManager.ins().getRTMClient().finishAudienceLinkByHost(
+            LiveRTCManager.ins().getRTSClient().finishAudienceLinkByHost(
                     mRoomId,
                     new IRequestCallback<LiveResponse>() {
                         @Override
@@ -150,7 +153,7 @@ public class AddGuestsDialog extends BaseDialog {
 
     private static class GuestListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-        private final List<LiveUserInfo> mData = new LinkedList<>();
+        private final List<LiveUserInfo> mData = new ArrayList<>();
         private final AddGuestClickListener mAddGuestCallback;
 
         public GuestListAdapter(AddGuestClickListener coHostCallback) {
@@ -255,14 +258,14 @@ public class AddGuestsDialog extends BaseDialog {
             mUserNameTv = itemView.findViewById(R.id.item_voice_user_name);
             mOptionTv = itemView.findViewById(R.id.item_voice_user_option);
             mCoHostCallback = coHostCallback;
-            mOptionTv.setOnClickListener((v) -> {
+            mOptionTv.setOnClickListener(DebounceClickListener.create(v -> {
                 if (mInfo != null && mCoHostCallback != null) {
                     LiveUserInfo info = mInfo;
                     if (info.linkMicStatus == LINK_MIC_STATUS_OTHER) {
                         mCoHostCallback.onClick(info);
                     }
                 }
-            });
+            }));
         }
 
         public void bind(LiveUserInfo info) {

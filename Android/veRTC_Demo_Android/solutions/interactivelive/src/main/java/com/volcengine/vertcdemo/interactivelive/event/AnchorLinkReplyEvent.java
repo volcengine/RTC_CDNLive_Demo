@@ -1,12 +1,12 @@
 package com.volcengine.vertcdemo.interactivelive.event;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizInform;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizInform;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveUserInfo;
 
 import java.util.List;
 
-public class AnchorLinkReplyEvent implements RTMBizInform {
+public class AnchorLinkReplyEvent implements RTSBizInform {
     @SerializedName("invitee")
     public LiveUserInfo userInfo;
     @SerializedName("linker_id")

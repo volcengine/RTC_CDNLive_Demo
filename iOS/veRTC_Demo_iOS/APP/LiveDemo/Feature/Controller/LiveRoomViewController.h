@@ -2,13 +2,13 @@
 //  LiveRoomViewController.h
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import "LiveReconnectModel.h"
 #import "LiveRoomInfoModel.h"
-#import "LiveRoomSettingCompoments.h"
+#import "LiveRoomSettingComponent.h"
 #import "LiveUserModel.h"
 #import "RoomStatusModel.h"
 #import <UIKit/UIKit.h>
@@ -17,8 +17,8 @@
 @interface LiveRoomViewController : UIViewController
 
 @property (nonatomic, copy) void (^hangUpBlock)(BOOL result);
-@property (nonatomic, strong) LiveRoomSettingCompoments *settingCompoments;
-@property (nonatomic, strong) BytedEffectProtocol *beautyCompoments;
+@property (nonatomic, strong) LiveRoomSettingComponent *settingComponent;
+@property (nonatomic, strong) BytedEffectProtocol *beautyComponent;
 
 - (instancetype)initWithRoomModel:(LiveRoomInfoModel *)liveRoomModel
                     streamPushUrl:(NSString *)streamPushUrl;

@@ -6,10 +6,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.ss.video.rtc.demo.basic_module.acivities.BaseActivity;
 import com.ss.video.rtc.demo.basic_module.utils.Utilities;
+import com.ss.video.rtc.demo.basic_module.utils.WindowUtils;
 import com.volcengine.vertcdemo.common.SolutionToast;
 import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.core.net.IRequestCallback;
@@ -17,13 +19,14 @@ import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.bean.CreateLiveRoomResponse;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveRoomInfo;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveUserInfo;
-import com.volcengine.vertcdemo.interactivelive.view.LiveSettingDialog;
 import com.volcengine.vertcdemo.interactivelive.core.LiveConstants;
+import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
-import com.volcengine.vertcdemo.interactivelive.feature.createroom.effect.EffectDialog;
 import com.volcengine.vertcdemo.interactivelive.feature.liveroommain.LiveRoomMainActivity;
+import com.volcengine.vertcdemo.interactivelive.view.LiveSettingDialog;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
-public class CreateLiveRoomActivity extends BaseActivity implements View.OnClickListener {
+public class CreateLiveRoomActivity extends BaseActivity {
 
     private View mBackBtn;
     private View mSwitchCameraBtn;
@@ -71,6 +74,9 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
         LiveRTCManager.ins().turnOnCamera(true);
         LiveRTCManager.ins().turnOnMic(true);
         LiveRTCManager.ins().switchCamera(true);
+        LiveRTCManager.ins().setResolution(LiveDataManager.USER_ROLE_HOST,
+                LiveRTCManager.ins().getWidth(LiveDataManager.USER_ROLE_HOST),
+                LiveRTCManager.ins().getHeight(LiveDataManager.USER_ROLE_HOST));
     }
 
     @Override
@@ -78,15 +84,15 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
         super.onGlobalLayoutCompleted();
 
         mStartLiveBtn = findViewById(R.id.start_live);
-        mStartLiveBtn.setOnClickListener(this);
+        mStartLiveBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mBackBtn = findViewById(R.id.exit_create_live);
-        mBackBtn.setOnClickListener(this);
+        mBackBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mSwitchCameraBtn = findViewById(R.id.switch_camera_iv);
-        mSwitchCameraBtn.setOnClickListener(this);
+        mSwitchCameraBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mVideoEffectBtn = findViewById(R.id.effect_iv);
-        mVideoEffectBtn.setOnClickListener(this);
+        mVideoEffectBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mVideoSettingBtn = findViewById(R.id.settings_iv);
-        mVideoSettingBtn.setOnClickListener(this);
+        mVideoSettingBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         FrameLayout mLocalVideoViewContainer = findViewById(R.id.preview_view_container);
         mLocalVideoView = LiveRTCManager.ins().getUserRenderView(SolutionDataManager.ins().getUserId());
         Utilities.removeFromParent(mLocalVideoView);
@@ -95,8 +101,7 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
-    @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         if (v == mBackBtn) {
             onBackPressed();
         } else if (v == mSwitchCameraBtn) {
@@ -122,13 +127,23 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
         LiveRTCManager.ins().startCaptureVideo(false);
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        LiveRTCManager.ins().removeAllUserRenderView();
+    }
+
+    @Override
+    protected void setupStatusBar() {
+        WindowUtils.setLayoutFullScreen(getWindow());
+    }
+
     private void switchCamera() {
         LiveRTCManager.ins().switchCamera();
     }
 
     private void openVideoEffectDialog() {
-        EffectDialog effectDialog = new EffectDialog(this);
-        effectDialog.show();
+        LiveRTCManager.ins().openEffectDialog(this);
     }
 
     private void openVideoVideoSettingDialog() {
@@ -146,7 +161,7 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
             return;
         }
         mLastClickStartLiveTs = now;
-        LiveRTCManager.ins().getRTMClient().requestStartLive(mRoomInfo.roomId, new IRequestCallback<LiveUserInfo>() {
+        LiveRTCManager.ins().getRTSClient().requestStartLive(mRoomInfo.roomId, new IRequestCallback<LiveUserInfo>() {
             @Override
             public void onSuccess(LiveUserInfo userInfo) {
                 LiveRoomMainActivity.startFromCreate(CreateLiveRoomActivity.this,
@@ -162,7 +177,7 @@ public class CreateLiveRoomActivity extends BaseActivity implements View.OnClick
     }
 
     private void requestCreateLiveRoom() {
-        LiveRTCManager.ins().getRTMClient().requestCreateLiveRoom(mCreateLiveRoomCallback);
+        LiveRTCManager.ins().getRTSClient().requestCreateLiveRoom(mCreateLiveRoomCallback);
     }
 
     private void showToast(String toast) {

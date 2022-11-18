@@ -1,9 +1,9 @@
 package com.volcengine.vertcdemo.interactivelive.event;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizInform;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizInform;
 
-public class AudienceMediaUpdateEvent implements RTMBizInform {
+public class AudienceMediaUpdateEvent implements RTSBizInform {
     @SerializedName("guest_room_id")
     public String guestRoomId;
     @SerializedName("guest_user_id")

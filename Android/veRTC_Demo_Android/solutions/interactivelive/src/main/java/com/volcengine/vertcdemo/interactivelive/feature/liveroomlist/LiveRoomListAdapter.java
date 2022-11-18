@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveRoomInfo;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,16 +61,17 @@ public class LiveRoomListAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         private final TextView mHostname;
         private final TextView mLiveRoomId;
         private LiveRoomInfo mLiveRoomInfo;
+
         public LiveRoomListViewHolder(@NonNull View itemView, OnLiveItemClickListener onClassItemClickListener) {
             super(itemView);
             mNamePrefix = itemView.findViewById(R.id.item_live_room_layout_avatar);
             mHostname = itemView.findViewById(R.id.item_live_room_layout_user_name);
             mLiveRoomId = itemView.findViewById(R.id.item_live_room_layout_room_id);
-            itemView.setOnClickListener(v -> {
+            itemView.setOnClickListener(DebounceClickListener.create(v -> {
                 if (onClassItemClickListener != null) {
                     onClassItemClickListener.onLiveClick(mLiveRoomInfo);
                 }
-            });
+            }));
         }
 
         public void bind(LiveRoomInfo info) {

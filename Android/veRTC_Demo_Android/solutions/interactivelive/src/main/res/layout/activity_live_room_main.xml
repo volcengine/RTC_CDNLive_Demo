@@ -4,6 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:keepScreenOn="true"
+    android:paddingTop="25dp"
     tools:background="#000">
 
     <FrameLayout
@@ -29,7 +31,7 @@
             android:textSize="40sp" />
     </FrameLayout>
 
-    <com.volcengine.vertcdemo.interactivelive.view.LiveVideoLayout
+    <com.volcengine.vertcdemo.interactivelive.view.LiveVideoView
         android:id="@+id/main_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

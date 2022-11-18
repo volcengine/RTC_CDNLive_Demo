@@ -1,22 +1,34 @@
 package com.volcengine.vertcdemo.interactivelive.feature.liveroomlist;
 
+import static com.volcengine.vertcdemo.core.net.rts.RTSInfo.KEY_RTM;
+
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.ss.video.rtc.demo.basic_module.acivities.BaseActivity;
 import com.ss.video.rtc.demo.basic_module.utils.SafeToast;
+import com.ss.video.rtc.demo.basic_module.utils.Utilities;
+import com.ss.video.rtc.demo.basic_module.utils.WindowUtils;
+import com.vertcdemo.joinrtsparams.bean.JoinRTSRequest;
+import com.vertcdemo.joinrtsparams.common.JoinRTSManager;
+import com.volcengine.vertcdemo.common.IAction;
 import com.volcengine.vertcdemo.common.SolutionToast;
+import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.core.net.IRequestCallback;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBaseClient;
-import com.volcengine.vertcdemo.core.net.rtm.RtmInfo;
+import com.volcengine.vertcdemo.core.net.ServerResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBaseClient;
+import com.volcengine.vertcdemo.core.net.rts.RTSInfo;
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveResponse;
 import com.volcengine.vertcdemo.interactivelive.bean.LiveRoomInfo;
@@ -27,16 +39,19 @@ import com.volcengine.vertcdemo.interactivelive.core.LiveConstants;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
 import com.volcengine.vertcdemo.interactivelive.feature.createroom.CreateLiveRoomActivity;
 import com.volcengine.vertcdemo.interactivelive.feature.liveroommain.LiveRoomMainActivity;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import java.util.List;
 
-public class LiveRoomListActivity extends BaseActivity implements View.OnClickListener {
+public class LiveRoomListActivity extends BaseActivity {
+
+    private static final String TAG = "LiveRoomListActivity";
 
     public static final int JOIN_LIVE_ROOM_REQUEST_CODE = 1000;
     public static final String JOIN_LIVE_ROOM_RESULT_MESSAGE = "result_message";
     public static final String EXTRA_II_RTM_INFO = "il_rtm_info";
 
-    private RtmInfo mRtmInfo;
+    private RTSInfo mRtmInfo;
 
     private ImageView mRefreshBtn;
     private View mCreateLiveBtn;
@@ -76,7 +91,7 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
         if (intent == null) {
             return;
         }
-        mRtmInfo = intent.getParcelableExtra(RtmInfo.KEY_RTM);
+        mRtmInfo = intent.getParcelableExtra(RTSInfo.KEY_RTM);
         if (mRtmInfo == null || !mRtmInfo.isValid()) {
             finish();
         }
@@ -93,7 +108,7 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
         mRefreshBtn = findViewById(R.id.title_bar_right_iv);
         mRefreshBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         mRefreshBtn.setImageResource(R.drawable.refresh);
-        mRefreshBtn.setOnClickListener(v -> requestRoomList());
+        mRefreshBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
 
         mNoLiveTv = findViewById(R.id.no_live_tv);
         RecyclerView liveListRv = findViewById(R.id.live_list_rv);
@@ -101,12 +116,12 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
         mLiveRoomListAdapter = new LiveRoomListAdapter(info -> enterLiveRoom(info.roomId, info.anchorUserId));
         liveListRv.setAdapter(mLiveRoomListAdapter);
         mCreateLiveBtn = findViewById(R.id.live_room_list_create_room);
-        mCreateLiveBtn.setOnClickListener(this);
+        mCreateLiveBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
 
         LiveRTCManager.ins().rtcConnect(mRtmInfo);
 
-        LiveRTCManager.ins().getRTMClient().login(mRtmInfo.rtmToken, (resultCode, message) -> {
-            if (resultCode == RTMBaseClient.LoginCallBack.SUCCESS) {
+        LiveRTCManager.ins().getRTSClient().login(mRtmInfo.rtmToken, (resultCode, message) -> {
+            if (resultCode == RTSBaseClient.LoginCallBack.SUCCESS) {
                 requestRoomList();
             } else {
                 SafeToast.show("Login Rtm Fail Error:" + resultCode + ",Message:" + message);
@@ -115,14 +130,18 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
     }
 
     @Override
-    public void finish() {
-        super.finish();
-        LiveRTCManager.ins().clearRTMEventListener();
-        LiveRTCManager.ins().getRTMClient().logout();
-        LiveRTCManager.ins().destroyEngine();
+    protected void setupStatusBar() {
+        WindowUtils.setLayoutFullScreen(getWindow());
     }
 
     @Override
+    public void finish() {
+        super.finish();
+        LiveRTCManager.ins().clearRTSEventListener();
+        LiveRTCManager.ins().getRTSClient().logout();
+        LiveRTCManager.ins().destroyEngine();
+    }
+
     public void onClick(View v) {
         if (v == mRefreshBtn) {
             requestRoomList();
@@ -137,15 +156,15 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
             return;
         }
         mLastClickGetListTs = now;
-        LiveRTCManager.ins().getRTMClient().requestLiveClearUser(new IRequestCallback<LiveResponse>() {
+        LiveRTCManager.ins().getRTSClient().requestLiveClearUser(new IRequestCallback<LiveResponse>() {
             @Override
             public void onSuccess(LiveResponse data) {
-                LiveRTCManager.ins().getRTMClient().requestLiveRoomList(mRequestListRoomList);
+                LiveRTCManager.ins().getRTSClient().requestLiveRoomList(mRequestListRoomList);
             }
 
             @Override
             public void onError(int errorCode, String message) {
-                LiveRTCManager.ins().getRTMClient().requestLiveRoomList(mRequestListRoomList);
+                LiveRTCManager.ins().getRTSClient().requestLiveRoomList(mRequestListRoomList);
             }
         });
     }
@@ -196,5 +215,40 @@ public class LiveRoomListActivity extends BaseActivity implements View.OnClickLi
                 showToast(data.getStringExtra(JOIN_LIVE_ROOM_RESULT_MESSAGE));
             }
         }
+    }
+
+    @Keep
+    @SuppressWarnings("unused")
+    public static void prepareSolutionParams(Activity activity, IAction<Object> doneAction) {
+        Log.d(TAG, "prepareSolutionParams() invoked");
+        IRequestCallback<ServerResponse<RTSInfo>> callback = new IRequestCallback<ServerResponse<RTSInfo>>() {
+            @Override
+            public void onSuccess(ServerResponse<RTSInfo> response) {
+                RTSInfo data = response == null ? null : response.getData();
+                if (data == null || !data.isValid()) {
+                    onError(-1, "");
+                    return;
+                }
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.setClass(Utilities.getApplicationContext(), LiveRoomListActivity.class);
+                intent.putExtra(KEY_RTM, data);
+                activity.startActivity(intent);
+                if (doneAction != null) {
+                    doneAction.act(null);
+                }
+            }
+
+            @Override
+            public void onError(int errorCode, String message) {
+                if (doneAction != null) {
+                    doneAction.act(null);
+                }
+            }
+        };
+        JoinRTSRequest request = new JoinRTSRequest();
+        request.scenesName = LiveConstants.SOLUTION_NAME_ABBR;
+        request.loginToken = SolutionDataManager.ins().getToken();
+
+        JoinRTSManager.setAppInfoAndJoinRTM(request, callback);
     }
 }

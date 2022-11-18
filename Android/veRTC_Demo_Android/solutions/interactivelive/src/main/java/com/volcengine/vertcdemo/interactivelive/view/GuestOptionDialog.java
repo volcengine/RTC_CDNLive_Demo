@@ -1,10 +1,13 @@
 package com.volcengine.vertcdemo.interactivelive.view;
 
+import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_KEEP;
+import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_OFF;
+import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_ON;
+
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -20,15 +23,12 @@ import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
 import com.volcengine.vertcdemo.interactivelive.event.AudienceLinkFinishEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LocalKickUserEvent;
 import com.volcengine.vertcdemo.interactivelive.event.MediaChangedEvent;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_KEEP;
-import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_OFF;
-import static com.volcengine.vertcdemo.interactivelive.core.LiveDataManager.MEDIA_STATUS_ON;
-
-public class GuestOptionDialog extends BaseDialog implements View.OnClickListener {
+public class GuestOptionDialog extends BaseDialog {
 
     private final int mDisableColor = Color.parseColor("#22E5E6EB");
     private final int mEnableColor = Color.parseColor("#FFFFFF");
@@ -54,13 +54,59 @@ public class GuestOptionDialog extends BaseDialog implements View.OnClickListene
         super.onCreate(savedInstanceState);
 
         mCloseConnect = findViewById(R.id.close_connect_btn);
-        mCloseConnect.setOnClickListener(this);
+        mCloseConnect.setOnClickListener(DebounceClickListener.create(v -> LiveRTCManager.ins().getRTSClient()
+                .kickAudienceByHost(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
+                        new IRequestCallback<LiveResponse>() {
+
+                            @Override
+                            public void onSuccess(LiveResponse data) {
+                                dismiss();
+                                SolutionDemoEventManager.post(new LocalKickUserEvent(mUserInfo.userId));
+                            }
+
+                            @Override
+                            public void onError(int errorCode, String message) {
+
+                            }
+                        })));
         mCameraTv = findViewById(R.id.camera_btn);
-        mCameraTv.setOnClickListener(this);
+        mCameraTv.setOnClickListener(DebounceClickListener.create(v -> LiveRTCManager.ins().getRTSClient()
+                .requestManageGuest(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
+                        MEDIA_STATUS_OFF, MEDIA_STATUS_KEEP,
+                        new IRequestCallback<LiveResponse>() {
+
+                            @Override
+                            public void onSuccess(LiveResponse data) {
+                                mUserInfo.cameraStatus = MEDIA_STATUS_OFF;
+                                updateMediaStatus();
+                                dismiss();
+                            }
+
+                            @Override
+                            public void onError(int errorCode, String message) {
+
+                            }
+                        })));
         mMicTv = findViewById(R.id.mic_btn);
-        mMicTv.setOnClickListener(this);
+        mMicTv.setOnClickListener(DebounceClickListener.create(v -> LiveRTCManager.ins().getRTSClient()
+                .requestManageGuest(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
+                        MEDIA_STATUS_KEEP, LiveDataManager.MEDIA_STATUS_OFF,
+                        new IRequestCallback<LiveResponse>() {
+
+                            @Override
+                            public void onSuccess(LiveResponse data) {
+                                mUserInfo.cameraStatus = MEDIA_STATUS_ON;
+                                updateMediaStatus();
+                                dismiss();
+                            }
+
+                            @Override
+                            public void onError(int errorCode, String message) {
+
+                            }
+                        })));
         mDismissTv = findViewById(R.id.dismiss_btn);
-        mDismissTv.setOnClickListener(this);
+        mDismissTv.setOnClickListener(DebounceClickListener.create(v -> dismiss()));
         updateMediaStatus();
     }
 
@@ -86,62 +132,6 @@ public class GuestOptionDialog extends BaseDialog implements View.OnClickListene
             mMicTv.setTextColor(mEnableColor);
         } else {
             mMicTv.setTextColor(mDisableColor);
-        }
-    }
-
-    @Override
-    public void onClick(View v) {
-        if (v == mDismissTv) {
-            dismiss();
-        } else if (v == mCameraTv) {
-            LiveRTCManager.ins().getRTMClient().requestManageGuest(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
-                    MEDIA_STATUS_OFF, MEDIA_STATUS_KEEP,
-                    new IRequestCallback<LiveResponse>() {
-
-                        @Override
-                        public void onSuccess(LiveResponse data) {
-                            mUserInfo.cameraStatus = MEDIA_STATUS_OFF;
-                            updateMediaStatus();
-                            dismiss();
-                        }
-
-                        @Override
-                        public void onError(int errorCode, String message) {
-
-                        }
-                    });
-        } else if (v == mMicTv) {
-            LiveRTCManager.ins().getRTMClient().requestManageGuest(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
-                    MEDIA_STATUS_KEEP, LiveDataManager.MEDIA_STATUS_OFF,
-                    new IRequestCallback<LiveResponse>() {
-
-                        @Override
-                        public void onSuccess(LiveResponse data) {
-                            mUserInfo.cameraStatus = MEDIA_STATUS_ON;
-                            updateMediaStatus();
-                            dismiss();
-                        }
-
-                        @Override
-                        public void onError(int errorCode, String message) {
-
-                        }
-                    });
-        } else if (v == mCloseConnect) {
-            LiveRTCManager.ins().getRTMClient().kickAudienceByHost(mRoomId, mHostUserId, mRoomId, mUserInfo.userId,
-                    new IRequestCallback<LiveResponse>() {
-
-                        @Override
-                        public void onSuccess(LiveResponse data) {
-                            dismiss();
-                            SolutionDemoEventManager.post(new LocalKickUserEvent(mUserInfo.userId));
-                        }
-
-                        @Override
-                        public void onError(int errorCode, String message) {
-
-                        }
-                    });
         }
     }
 

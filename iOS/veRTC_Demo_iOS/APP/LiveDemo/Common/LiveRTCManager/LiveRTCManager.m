@@ -2,16 +2,16 @@
 //  LiveRTCManager.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/10/24.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/10/24.
+//  
 //
 
-#import <VolcEngineRTC/objc/rtc/ByteRTCEngineKit.h>
+#import <VolcEngineRTC/objc/ByteRTCVideo.h>
 #import "LiveRTCManager.h"
 #import "LiveSettingVideoConfig.h"
 #import "BytedPlayerProtocol.h"
 
-@interface LiveRTCManager () <ByteRTCEngineDelegate, LiveTranscodingDelegate, ByteRTCVideoSinkDelegate, ByteRTCAudioProcessor>
+@interface LiveRTCManager () <ByteRTCVideoDelegate, LiveTranscodingDelegate>
 
 //RTMP Pull Player
 @property (nonatomic, strong) BytedPlayerProtocol *player;
@@ -23,7 +23,7 @@
 @property (nonatomic, strong) ByteRTCLiveTranscoding *transcodingSetting;
 
 //RTC Push video streaming settings
-@property (nonatomic, strong) ByteRTCVideoSolution *pushRTCVideoConfig;
+@property (nonatomic, strong) ByteRTCVideoEncoderConfig *pushRTCVideoConfig;
 
 //Video stream and user model binding use
 @property (nonatomic, strong) NSMutableDictionary<NSString *, UIView *> *streamViewDic;
@@ -63,18 +63,61 @@
     [self.rtcEngineKit setVideoCaptureConfig:captureConfig];
     
     // Encoder config
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    [self.rtcEngineKit SetMaxVideoEncoderConfig:self.pushRTCVideoConfig];
     
     // Video Mirror
     [self.rtcEngineKit setLocalVideoMirrorType:ByteRTCMirrorTypeRenderAndEncoder];
     
     // Confluence retweet Setting
     _transcodingSetting = [ByteRTCLiveTranscoding defaultTranscoding];
+    
+    // Initialize player configuration
+    [self player];
+}
+
+- (void)joinRTCRoomByToken:(NSString *)token
+                 rtcRoomID:(NSString *)rtcRoomID
+                    userID:(NSString *)userID {
+    ByteRTCUserInfo *userInfo = [[ByteRTCUserInfo alloc] init];
+    userInfo.userId = userID;
+    ByteRTCRoomConfig *config = [[ByteRTCRoomConfig alloc] init];
+    config.profile = ByteRTCRoomProfileInteractivePodcast;
+    config.isAutoPublish = YES;
+    config.isAutoSubscribeAudio = YES;
+    config.isAutoSubscribeVideo = YES;
+    self.rtcRoom = [self.rtcEngineKit createRTCRoom:rtcRoomID];
+    self.rtcRoom.delegate = self;
+    [self.rtcRoom joinRoomByToken:token userInfo:userInfo roomConfig:config];
+    
+    NSLog(@"Manager RTCSDK joinRoomByToken %@|%@", rtcRoomID, userID);
+}
+
+- (void)leaveRTCRoom {
+    NSString *saveKey = @"";
+    UIView *saveView = nil;
+    for (NSString *key in self.streamViewDic.allKeys) {
+        if ([key containsString:@"self_"]) {
+            saveKey = key;
+            saveView = self.streamViewDic[key];
+            break;
+        }
+    }
+    [self.streamViewDic removeAllObjects];
+    if (saveView && NOEmptyStr(saveKey)) {
+        [self.streamViewDic setValue:saveView forKey:saveKey];
+    }
+    
+    [self.rtcRoom leaveRoom];
+    [self.rtcRoom destroy];
+    self.rtcRoom = nil;
+    NSLog(@"Manager RTCSDK leaveRTCRoom");
 }
 
 - (void)startMixStreamRetweetWithPushUrl:(NSString *)pushUrl
                                 hostUser:(LiveUserModel *)hostUser
                                rtcRoomId:(NSString *)rtcRoomId {
+    // 开启合流
+    // Enable confluence
     if (NOEmptyStr(pushUrl)) {
         [self startCapture];
         
@@ -87,13 +130,13 @@
         
         // Regions
         NSArray *regions = [self getRegionWithUserList:@[hostUser]
-                                        mixStatus:RTCMixStatusSingleLive
+                                             mixStatus:RTCMixStatusSingleLive
                                              rtcRoomId:rtcRoomId];
         
         _transcodingSetting.layout.appData = json;
         _transcodingSetting.layout.regions = regions;
         _transcodingSetting.roomId = rtcRoomId;
-        _transcodingSetting.userId = [LocalUserComponents userModel].uid;
+        _transcodingSetting.userId = [LocalUserComponent userModel].uid;
         _transcodingSetting.url = pushUrl;
         _transcodingSetting.expectedMixingType = ByteRTCStreamMixingTypeByServer;
         _transcodingSetting.audio.sampleRate = 44100;
@@ -113,6 +156,10 @@
 - (void)updateTranscodingLayout:(NSArray<LiveUserModel *> *)userList
                       mixStatus:(RTCMixStatus)mixStatus
                       rtcRoomId:(NSString *)rtcRoomId {
+    // 更新合流布局
+    // Update the merge layout
+    
+    // 设置合流 SEI
     // Set mix SEI
     NSString *json = [self getSEIJsonWithMixStatus:mixStatus];
     
@@ -121,8 +168,9 @@
     if (mixStatus == RTCMixStatusCoHost) {
         pushRTCVideoSize = [self getMaxUserVideSize:userList];
     }
-    self.pushRTCVideoConfig.videoSize = pushRTCVideoSize;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    self.pushRTCVideoConfig.width = pushRTCVideoSize.width;
+    self.pushRTCVideoConfig.height = pushRTCVideoSize.height;
+    [self.rtcEngineKit SetMaxVideoEncoderConfig:self.pushRTCVideoConfig];
     
     _transcodingSetting.layout.appData = json;
     _transcodingSetting.layout.regions = [self getRegionWithUserList:userList
@@ -133,20 +181,30 @@
     NSLog(@"Manager RTCSDK updateTranscodingLayout");
 }
 
+#pragma mark - Start CoHost PK
+
 - (void)startForwardStreamToRooms:(NSString *)roomId token:(NSString *)token {
+    // 开启跨 RTC 房间转推
+    // Enable cross-RTC room retweets
     ForwardStreamConfiguration *configuration = [[ForwardStreamConfiguration alloc] init];
     configuration.roomId = roomId;
     configuration.token = token;
-    [self.rtcEngineKit startForwardStreamToRooms:@[configuration]];
+    
+    [self.rtcRoom startForwardStreamToRooms:@[configuration]];
     
     NSLog(@"Manager RTCSDK startForwardStreamToRooms %@", roomId);
 }
 
 - (void)stopForwardStreamToRooms {
-    self.pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+    // 结束跨 RTC 房间转推
+    // End retweet across RTC room
+    CGSize videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+    self.pushRTCVideoConfig.width = videoSize.width;
+    self.pushRTCVideoConfig.height = videoSize.height;
+    
+    [self.rtcEngineKit SetMaxVideoEncoderConfig:self.pushRTCVideoConfig];
     _mixStatus = RTCMixStatusSingleLive;
-    [self.rtcEngineKit stopForwardStreamToRooms];
+    [self.rtcRoom stopForwardStreamToRooms];
     
     NSLog(@"Manager RTCSDK stopForwardStreamToRooms");
 }
@@ -217,20 +275,30 @@
 
 - (void)muteRemoteAudio:(NSString *)uid mute:(BOOL)isMute {
     if (isMute) {
-        [self.rtcEngineKit pauseAllSubscribedStream:ByteRTCControlMediaTypeAudio];
+        [self.rtcRoom pauseAllSubscribedStream:ByteRTCControlMediaTypeAudio];
     } else {
-        [self.rtcEngineKit resumeAllSubscribedStream:ByteRTCControlMediaTypeAudio];
+        [self.rtcRoom resumeAllSubscribedStream:ByteRTCControlMediaTypeAudio];
     }
     
+    NSArray *regions = _transcodingSetting.layout.regions;
+    for (ByteRTCVideoCompositingRegion *region in regions) {
+        if (![region.uid isEqualToString:[LocalUserComponent userModel].uid]) {
+            region.contentControl = isMute ? ByteRTCTranscoderContentControlTypeHasVideoOnly : ByteRTCTranscoderContentControlTypeHasAudioAndVideo;
+        }
+    }
+    [self.rtcEngineKit updateLiveTranscoding:@""
+                                 transcoding:_transcodingSetting];
     NSLog(@"Manager RTCSDK muteRemoteAudio");
 }
 
 - (void)leaveLiveRoom {
+    CGSize videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+    [self updateVideoEncoderRes:videoSize];
     [self.rtcEngineKit setAudioFrameObserver:nil];
     [self.rtcEngineKit stopLiveTranscoding:@""];
     [self stopCapture];
     [self leaveRTCRoom];
-    [self leaveMultiRoom];
+    [self leaveMultiRTSRoom];
     [self.streamViewDic removeAllObjects];
     self.cameraID = ByteRTCCameraIDFront;
     
@@ -256,52 +324,76 @@
     [self enableLocalVideo:NO];
 }
 
-- (void)updateRes:(CGSize)size {
-    self.pushRTCVideoConfig.videoSize = size;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+- (void)updateVideoEncoderRes:(CGSize)size {
+    self.pushRTCVideoConfig.width = size.width;
+    self.pushRTCVideoConfig.height = size.height;
+    [self.rtcEngineKit SetMaxVideoEncoderConfig:self.pushRTCVideoConfig];
+}
+
+- (void)updateLiveTranscodingRes:(CGSize)size {
+    _transcodingSetting.video.width = size.width;
+    _transcodingSetting.video.height = size.height;
+    [self.rtcEngineKit updateLiveTranscoding:@""
+                                 transcoding:_transcodingSetting];
+    
     NSLog(@"Manager PushEngine updateRes");
 }
 
-- (void)updateFPS:(CGFloat)fps {
-    self.pushRTCVideoConfig.frameRate = fps;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+- (void)updateLiveTranscodingFPS:(CGFloat)fps {
+    _transcodingSetting.video.fps = fps;
+    [self.rtcEngineKit updateLiveTranscoding:@""
+                                 transcoding:_transcodingSetting];
+    
     NSLog(@"Manager PushEngine updateFPS");
 }
 
-- (void)updateKBitrate:(NSInteger)kbitrate min:(NSInteger)min max:(NSInteger)max {
-    self.pushRTCVideoConfig.maxKbps = kbitrate;
-    [self.rtcEngineKit setVideoEncoderConfig:@[self.pushRTCVideoConfig]];
+- (void)updateLiveTranscodingKBitrate:(NSInteger)kbitrate {
+    _transcodingSetting.video.kBitRate = kbitrate;
+    [self.rtcEngineKit updateLiveTranscoding:@""
+                                 transcoding:_transcodingSetting];
     NSLog(@"Manager PushEngine updateKBitrate");
 }
 
 #pragma mark - Pull
 
 - (void)startPlayWithUrl:(NSString *)urlStr
-               superView:(UIView *)superView {
+               superView:(UIView *)superView
+                SEIBlcok:(void (^)(NSDictionary *SEIDic))SEIBlcok {
+    // 使用播放器，拉取 CDN 音视频流
+    // Use the player to pull CDN audio and video streams
     if (![_currentPullUrl isEqualToString:urlStr]) {
         _currentPullUrl = urlStr;
-        if (!self.player) {
-            self.player = [[BytedPlayerProtocol alloc] init];
-            [self.player startPlayWithUrl:urlStr superView:superView];
-        }
+        [self.player startPlayWithUrl:urlStr
+                            superView:superView
+                             SEIBlcok:SEIBlcok];
     }
     [self.player play];
     NSLog(@"Manager Pull startPlayWithUrl %@", urlStr);
 }
 
+- (BOOL)isSupportSEI {
+    // 播放器是否支持解析 SEI
+    // Whether the player supports parsing SEI
+    return [self.player isSupportSEI];
+}
+
 - (void)replacePlayWithUrl:(NSString *)url {
+    // 播放器更新拉流地址
+    // The player updates the pull stream address
     if ([_currentPullUrl isEqualToString:url]) {
         return;
     }
+    _currentPullUrl = url;
     [self.player replacePlayWithUrl:url];
     [self.player play];
 }
 
 - (void)stopPull {
+    // 播放器停止拉流
+    // The player stops pulling the stream
     _currentPullUrl = @"";
     if (self.player) {
         [self.player stop];
-        self.player = nil;
     }
     NSLog(@"Manager Pull stopPull");
 }
@@ -311,55 +403,13 @@
     NSLog(@"Manager Pull updatePlayScaleMode %d", isFill);
 }
 
-#pragma mark - Live Cohost / AddGuests
-
-- (void)joinRTCRoomByToken:(NSString *)token
-                 rtcRoomID:(NSString *)rtcRoomID
-                    userID:(NSString *)userID {
-    ByteRTCUserInfo *userInfo = [[ByteRTCUserInfo alloc] init];
-    userInfo.userId = userID;
-    
-    ByteRTCRoomConfig *config = [[ByteRTCRoomConfig alloc] init];
-    config.profile = ByteRTCRoomProfileLiveBroadcasting;
-    config.isAutoPublish = YES;
-    config.isAutoSubscribeAudio = YES;
-    config.isAutoSubscribeVideo = YES;
-    
-    [self.rtcEngineKit joinRoomByKey:token
-                              roomId:rtcRoomID
-                            userInfo:userInfo
-                       rtcRoomConfig:config];
-    
-    NSLog(@"Manager RTCSDK joinRoomByKey %@|%@", rtcRoomID, userID);
-}
-
-- (void)leaveRTCRoom {
-    NSString *saveKey = @"";
-    UIView *saveView = nil;
-    for (NSString *key in self.streamViewDic.allKeys) {
-        if ([key containsString:@"self_"]) {
-            saveKey = key;
-            saveView = self.streamViewDic[key];
-            break;
-        }
-    }
-    [self.streamViewDic removeAllObjects];
-    if (saveView && NOEmptyStr(saveKey)) {
-        [self.streamViewDic setValue:saveView forKey:saveKey];
-    }
-    
-    [self.rtcEngineKit leaveRoom];
-    NSLog(@"Manager RTCSDK leaveRTCRoom");
-}
-
 - (void)muteAllRemoteAudio:(BOOL)isMute {
     if (isMute) {
-        [self.rtcEngineKit pauseAllSubscribedStream:ByteRTCControlMediaTypeAudio];
+        [self.rtcRoom pauseAllSubscribedStream:ByteRTCControlMediaTypeAudio];
     } else {
-        [self.rtcEngineKit resumeAllSubscribedStream:ByteRTCControlMediaTypeAudio];
+        [self.rtcRoom resumeAllSubscribedStream:ByteRTCControlMediaTypeAudio];
     }
 }
-
 
 #pragma mark - LiveTranscodingDelegate
 
@@ -371,20 +421,24 @@
     return NO;
 }
 
-#pragma mark - ByteRTCEngineDelegate
+#pragma mark - ByteRTCVideoDelegate
 
-- (void)rtcEngine:(ByteRTCEngineKit *)engine onRoomStateChanged:(NSString *)roomId withUid:(NSString *)uid state:(NSInteger)state extraInfo:(NSString *)extraInfo {
-    [super rtcEngine:engine onRoomStateChanged:roomId withUid:uid state:state extraInfo:extraInfo];
-    [self bingCanvasViewToUid:uid];
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onRoomStateChanged:(NSString *)roomId withUid:(NSString *)uid state:(NSInteger)state extraInfo:(NSString *)extraInfo {
+    [super rtcRoom:rtcRoom onRoomStateChanged:roomId withUid:uid state:state extraInfo:extraInfo];
+    if ([rtcRoom.getRoomId isEqualToString:self.rtcRoom.getRoomId] ) {
+        [self bingCanvasViewToUid:uid];
+    }
     NSLog(@"Manager RTCSDK join %@|%ld", uid, (long)state);
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onUserJoined:(nonnull ByteRTCUserInfo *)userInfo elapsed:(NSInteger)elapsed {
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onUserJoined:(ByteRTCUserInfo *)userInfo elapsed:(NSInteger)elapsed {
     NSLog(@"Manager RTCSDK onUserJoined %@", userInfo.userId);
-    [self bingCanvasViewToUid:userInfo.userId];
+    if ([rtcRoom.getRoomId isEqualToString:self.rtcRoom.getRoomId] ) {
+        [self bingCanvasViewToUid:userInfo.userId];
+    }
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *)engine onUserPublishStream:(NSString *)userId type:(ByteRTCMediaStreamType)type {
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onUserPublishStream:(NSString *)userId type:(ByteRTCMediaStreamType)type {
     if (type == ByteRTCMediaStreamTypeBoth ||
         type == ByteRTCMediaStreamTypeVideo) {
         dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
@@ -396,11 +450,12 @@
     NSLog(@"Manager RTCSDK onUserPublishStream %@ %lu", userId, (unsigned long)type);
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onFirstRemoteVideoFrameRendered:(ByteRTCRemoteStreamKey *_Nonnull)streamKey withFrameInfo:(ByteRTCVideoFrameInfo *_Nonnull)frameInfo {
+- (void)rtcEngine:(ByteRTCVideo *)engine onFirstRemoteVideoFrameRendered:(ByteRTCRemoteStreamKey *)streamKey withFrameInfo:(ByteRTCVideoFrameInfo *)frameInfo {
     NSLog(@"Manager RTCSDK onFirstRemoteVideoFrameRendered %@", streamKey.userId);
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onLocalStreamStats:(const ByteRTCLocalStreamStats *_Nonnull)stats {
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onLocalStreamStats:(ByteRTCLocalStreamStats *)stats {
+
     LiveNetworkQualityStatus liveStatus = LiveNetworkQualityStatusNone;
     if (stats.tx_quality == ByteRTCNetworkQualityExcellent ||
         stats.tx_quality == ByteRTCNetworkQualityGood) {
@@ -409,11 +464,11 @@
         liveStatus = LiveNetworkQualityStatusBad;
     }
     if (self.networkQualityBlock) {
-        self.networkQualityBlock(liveStatus, [LocalUserComponents userModel].uid);
+        self.networkQualityBlock(liveStatus, [LocalUserComponent userModel].uid);
     }
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *_Nonnull)engine onRemoteStreamStats:(const ByteRTCRemoteStreamStats *_Nonnull)stats {
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onRemoteStreamStats:(ByteRTCRemoteStreamStats *)stats {
     LiveNetworkQualityStatus liveStatus = LiveNetworkQualityStatusNone;
     if (stats.tx_quality == ByteRTCNetworkQualityExcellent ||
         stats.tx_quality == ByteRTCNetworkQualityGood) {
@@ -426,7 +481,7 @@
     }
 }
 
-- (void)rtcEngine:(ByteRTCEngineKit *)engine onForwardStreamStateChanged:(NSArray<ForwardStreamStateInfo *> *)infos {
+- (void)rtcRoom:(ByteRTCRoom *)rtcRoom onForwardStreamStateChanged:(NSArray<ForwardStreamStateInfo *> *)infos {
     NSLog(@"Manager RTCSDK onForwardStreamStateChanged %@", infos);
 }
 
@@ -438,22 +493,31 @@
 
 #pragma mark - Getter
 
-- (ByteRTCVideoSolution *)pushRTCVideoConfig {
+- (ByteRTCVideoEncoderConfig *)pushRTCVideoConfig {
     if (!_pushRTCVideoConfig) {
-        _pushRTCVideoConfig = [[ByteRTCVideoSolution alloc] init];
-        _pushRTCVideoConfig.videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+        _pushRTCVideoConfig =[[ByteRTCVideoEncoderConfig alloc] init];
+        CGSize videoSize = [LiveSettingVideoConfig defultVideoConfig].videoSize;
+        _pushRTCVideoConfig.width = videoSize.width;
+        _pushRTCVideoConfig.height = videoSize.height;
         _pushRTCVideoConfig.frameRate = [LiveSettingVideoConfig defultVideoConfig].fps;
-        _pushRTCVideoConfig.maxKbps = [LiveSettingVideoConfig defultVideoConfig].bitrate;
+        _pushRTCVideoConfig.maxBitrate = [LiveSettingVideoConfig defultVideoConfig].bitrate;
     }
     return _pushRTCVideoConfig;
 }
 
+- (BytedPlayerProtocol *)player {
+    if (!_player) {
+        _player = [[BytedPlayerProtocol alloc] init];
+        [_player startWithConfiguration];
+    }
+    return _player;
+}
 
 #pragma mark - Private Action
 
 - (NSString *)getSEIJsonWithMixStatus:(RTCMixStatus)mixStatus {
     NSString *value = (mixStatus == RTCMixStatusCoHost) ? kLiveCoreSEIValueSourceCoHost : kLiveCoreSEIValueSourceNone;
-    NSDictionary *dic = @{kLiveCoreSEIKEYSource : value};
+    NSDictionary *dic = @{kLiveCoreSEIKEYSource : value ?: @""};
     NSString *json = [dic yy_modelToJSONString];
     return json;
 }
@@ -468,7 +532,7 @@
         ByteRTCVideoCompositingRegion *region = [[ByteRTCVideoCompositingRegion alloc] init];
         region.uid = userModel.uid;
         region.roomId = rtcRoomId;
-        region.localUser = [userModel.uid isEqualToString:[LocalUserComponents userModel].uid] ? YES : NO;
+        region.localUser = [userModel.uid isEqualToString:[LocalUserComponent userModel].uid] ? YES : NO;
         region.renderMode = ByteRTCRenderModeHidden;
         NSLog(@"Manager RTCSDK region user %d|%@", region.localUser, userModel.uid);
         switch (mixStatus) {
@@ -542,20 +606,50 @@
         return nil;
     }
     NSString *typeStr = @"";
-    if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
+    if ([uid isEqualToString:[LocalUserComponent userModel].uid]) {
         typeStr = @"self";
     } else {
         typeStr = @"remote";
     }
     NSString *key = [NSString stringWithFormat:@"%@_%@", typeStr, uid];
     UIView *view = self.streamViewDic[key];
+    if (!view && [uid isEqualToString:[LocalUserComponent userModel].uid]) {
+        UIView *streamView = [[UIView alloc] init];
+        streamView.hidden = YES;
+        ByteRTCVideoCanvas *canvas = [[ByteRTCVideoCanvas alloc] init];
+        canvas.uid = uid;
+        canvas.renderMode = ByteRTCRenderModeHidden;
+        canvas.view.backgroundColor = [UIColor clearColor];
+        canvas.view = streamView;
+        [self.rtcEngineKit setLocalVideoCanvas:ByteRTCStreamIndexMain
+                              withCanvas:canvas];
+        NSString *key = [NSString stringWithFormat:@"self_%@", uid];
+        [self.streamViewDic setValue:streamView forKey:key];
+        view = streamView;
+    }
     NSLog(@"getStreamViewWithUid : %@|%@", view, uid);
     return view;
 }
 
+- (void)removeCanvasLocalUid {
+    ByteRTCVideoCanvas *canvas = [[ByteRTCVideoCanvas alloc] init];
+    canvas.uid = [LocalUserComponent userModel].uid;
+    canvas.renderMode = ByteRTCRenderModeHidden;
+    canvas.view.backgroundColor = [UIColor clearColor];
+    canvas.view = nil;
+    [self.rtcEngineKit setLocalVideoCanvas:ByteRTCStreamIndexMain
+                          withCanvas:canvas];
+    NSString *key = [NSString stringWithFormat:@"self_%@", [LocalUserComponent userModel].uid];
+    [self.streamViewDic removeObjectForKey:key];
+}
+
 - (void)bingCanvasViewToUid:(NSString *)uid {
+    if (uid.length == 0) {
+        return;
+    }
+    
     dispatch_queue_async_safe(dispatch_get_main_queue(), (^{
-        if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
+        if ([uid isEqualToString:[LocalUserComponent userModel].uid]) {
             UIView *view = [self getStreamViewWithUid:uid];
             if (!view) {
                 UIView *streamView = [[UIView alloc] init];
@@ -580,9 +674,10 @@
                 canvas.renderMode = ByteRTCRenderModeHidden;
                 canvas.view.backgroundColor = [UIColor clearColor];
                 canvas.view = remoteRoomView;
-                [self.rtcEngineKit setRemoteVideoCanvas:canvas.uid
-                                        withIndex:ByteRTCStreamIndexMain
-                                       withCanvas:canvas];
+                canvas.roomId = self.rtcRoom.getRoomId;
+                [self.rtcEngineKit setRemoteVideoCanvas:uid
+                                            withIndex:ByteRTCStreamIndexMain
+                                           withCanvas:canvas];
                 
                 NSString *groupKey = [NSString stringWithFormat:@"remote_%@", uid];
                 [self.streamViewDic setValue:remoteRoomView forKey:groupKey];

@@ -2,8 +2,8 @@
 //  RoomStatusModel.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/11/4.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/11/4.
+//  
 //
 
 #import "RoomStatusModel.h"

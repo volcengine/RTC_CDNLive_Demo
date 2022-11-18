@@ -2,18 +2,18 @@
 //  LiveRoomViewController.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import "LiveRoomViewController.h"
-#import "LiveAddGuestsCompoments.h"
-#import "LiveCoHostCompoments.h"
+#import "LiveAddGuestsComponent.h"
+#import "LiveCoHostComponent.h"
 #import "LiveHostAvatarView.h"
-#import "LiveIMCompoments.h"
+#import "LiveIMComponent.h"
 #import "LivePeopleNumView.h"
-#import "LivePullStreamCompoments.h"
-#import "LivePushStreamCompoments.h"
+#import "LivePullStreamComponent.h"
+#import "LivePushStreamComponent.h"
 #import "LiveRTCManager.h"
 #import "LiveRoomBottomView.h"
 #import "LiveRoomGuestSettingView.h"
@@ -26,11 +26,11 @@
 @property (nonatomic, strong) LivePeopleNumView *peopleNumView;
 @property (nonatomic, strong) LiveHostAvatarView *hostAvatarView;
 @property (nonatomic, strong) LiveRoomBottomView *bottomView;
-@property (nonatomic, strong) LiveIMCompoments *imCompoments;
-@property (nonatomic, strong) LiveCoHostCompoments *coHostCompoments;
-@property (nonatomic, strong) LiveAddGuestsCompoments *addGuestsCompoments;
-@property (nonatomic, strong) LivePullStreamCompoments *livePullStreamCompoments;
-@property (nonatomic, strong) LivePushStreamCompoments *livePushStreamCompoments;
+@property (nonatomic, strong) LiveIMComponent *imComponent;
+@property (nonatomic, strong) LiveCoHostComponent *coHostComponent;
+@property (nonatomic, strong) LiveAddGuestsComponent *addGuestsComponent;
+@property (nonatomic, strong) LivePullStreamComponent *livePullStreamComponent;
+@property (nonatomic, strong) LivePushStreamComponent *livePushStreamComponent;
 @property (nonatomic, strong) UIView *liveView;
 @property (nonatomic, strong) UIView *giftView;
 
@@ -80,33 +80,33 @@
                 itemButton:(LiveRoomItemButton *_Nullable)itemButton
                 roleStatus:(BottomRoleStatus)roleStatus {
     if (itemButton.currentState == LiveRoomItemButtonStatePK) {
-        if (self.addGuestsCompoments.isConnect) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"与观众连线中，无法发起主播连线"];
+        if (self.addGuestsComponent.isConnect) {
+            [[ToastComponent shareToastComponent] showWithMessage:@"与观众连线中，无法发起主播连线"];
         } else {
             [self clickBottomCoHost:liveRoomBottomView
                          itemButton:itemButton
                          roleStatus:roleStatus];
         }
     } else if (itemButton.currentState == LiveRoomItemButtonStateChat) {
-        if (self.coHostCompoments.isConnect) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"主播连线中，无法发起观众连线"];
+        if (self.coHostComponent.isConnect) {
+            [[ToastComponent shareToastComponent] showWithMessage:@"主播连线中，无法发起观众连线"];
         } else {
             [self clickBottomAddGuests:liveRoomBottomView
                             itemButton:itemButton
                             roleStatus:roleStatus];
         }
     } else if (itemButton.currentState == LiveRoomItemButtonStateBeauty) {
-        if (!self.beautyCompoments) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"开源代码暂不支持美颜相关功能，体验效果请下载Demo"];
+        if (!self.beautyComponent) {
+            [[ToastComponent shareToastComponent] showWithMessage:@"开源代码暂不支持美颜相关功能，体验效果请下载Demo"];
             return;
         }
         if (roleStatus == BottomRoleStatusHost) {
-            [self.beautyCompoments showWithType:EffectBeautyRoleTypeHost
+            [self.beautyComponent showWithType:EffectBeautyRoleTypeHost
                                   fromSuperView:self.view dismissBlock:^(BOOL result) {
                 
             }];
         } else if (roleStatus == BottomRoleStatusGuests) {
-            [self.beautyCompoments showWithType:EffectBeautyRoleTypeGuest
+            [self.beautyComponent showWithType:EffectBeautyRoleTypeGuest
                                   fromSuperView:self.view dismissBlock:^(BOOL result) {
                 
             }];
@@ -135,6 +135,7 @@
         } else if (model.code == RTMStatusCodeUserIsInactive ||
                    model.code == RTMStatusCodeRoomDisbanded ||
                    model.code == RTMStatusCodeUserNotFound) {
+            [[ToastComponent shareToastComponent] showWithMessage:@"网络链接已断开，请检查设置" delay:0.8];
             [wself hangUp];
         } else {
             
@@ -146,10 +147,12 @@
 
 - (void)loadDataWithJoinLiveRoom {
     __weak __typeof(self) wself = self;
+    [[ToastComponent shareToastComponent] showLoading];
     [LiveRTMManager liveJoinLiveRoom:self.liveRoomModel.roomID
                                block:^(LiveRoomInfoModel *roomModel,
                                        LiveUserModel *userModel,
                                        RTMACKModel *model) {
+        [[ToastComponent shareToastComponent] dismiss];
         if (model.result) {
             [wself restoreRoomWithRoomInfoModel:roomModel
                                       userModel:userModel
@@ -186,7 +189,7 @@
                          otherAnchorToken:rtcToken];
             }
         } else {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
@@ -196,7 +199,7 @@
                                           linkerID:self.linkerID
                                              block:^(RTMACKModel * _Nonnull model) {
         if (!model.result) {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
@@ -222,7 +225,7 @@
                 [wself receivedAddGuestsJoin:userList];
             }
         } else {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
@@ -231,7 +234,7 @@
     [LiveRTMManager liveAudienceLinkmicFinish:self.liveRoomModel.roomID
                                                block:^(RTMACKModel * _Nonnull model) {
         if (!model.result) {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
@@ -250,15 +253,15 @@
         if (model.result) {
             if (reply == LiveInviteReplyPermitted) {
                 wself.linkerID = linkerID;
-                [wself.addGuestsCompoments joinRTCRoomByToken:rtcToken
+                [wself.addGuestsComponent joinRTCRoomByToken:rtcToken
                                                     rtcRoomID:rtcRoomID
-                                                       userID:[LocalUserComponents userModel].uid];
+                                                       userID:[LocalUserComponent userModel].uid];
                 [wself receivedAddGuestsJoin:userList];
                 // Guests update bottom ui
                 [wself.bottomView updateButtonRoleStatus:BottomRoleStatusGuests];
             }
         } else {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
@@ -272,18 +275,25 @@
             // Audience update bottom ui
             [wself.bottomView updateButtonRoleStatus:BottomRoleStatusAudience];
         } else {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
 }
 
 - (void)loadDataWithupdateRes:(LiveUserModel *)loginUserModel {
-    CGSize videoSize = (loginUserModel.role == 2) ? [LiveSettingVideoConfig defultVideoConfig].videoSize : [LiveSettingVideoConfig defultVideoConfig].guestVideoSize;
+    BOOL isHost = (loginUserModel.role == 2);
+    CGSize videoSize = isHost ? [LiveSettingVideoConfig defultVideoConfig].videoSize : [LiveSettingVideoConfig defultVideoConfig].guestVideoSize;
     [LiveRTMManager liveUpdateResWithSize:videoSize
-                                      roomID:self.liveRoomModel.roomID
-                                       block:^(RTMACKModel * _Nonnull model) {
+                                   roomID:self.liveRoomModel.roomID
+                                    block:^(RTMACKModel * _Nonnull model) {
         if (model.result) {
-            [[LiveRTCManager shareRtc] updateRes:videoSize];
+            // 主播更新合流分辨率和 RTC 编码分辨率，观众更新 RTC 编码分辨率
+            if (isHost) {
+                [[LiveRTCManager shareRtc] updateLiveTranscodingRes:videoSize];
+                [[LiveRTCManager shareRtc] updateVideoEncoderRes:videoSize];
+            } else {
+                [[LiveRTCManager shareRtc] updateVideoEncoderRes:videoSize];
+            }
         }
     }];
 }
@@ -294,9 +304,9 @@
     LiveIMModel *imModel = [[LiveIMModel alloc] init];
     imModel.isJoin = YES;
     imModel.userModel = userModel;
-    [self.imCompoments addIM:imModel];
+    [self.imComponent addIM:imModel];
     
-    [self.addGuestsCompoments updateList];
+    [self.addGuestsComponent updateList];
     [self.peopleNumView updateTitleLabel:audienceCount];
 }
 
@@ -304,14 +314,14 @@
     LiveIMModel *imModel = [[LiveIMModel alloc] init];
     imModel.isJoin = NO;
     imModel.userModel = userModel;
-    [self.imCompoments addIM:imModel];
+    [self.imComponent addIM:imModel];
     
-    [self.addGuestsCompoments updateList];
+    [self.addGuestsComponent updateList];
     [self.peopleNumView updateTitleLabel:audienceCount];
 }
 
 - (void)receivedIMMessage:(NSString *)message sendUserModel:(LiveUserModel *)sendUserModel {
-    if (![sendUserModel.uid isEqualToString:[LocalUserComponents userModel].uid]) {
+    if (![sendUserModel.uid isEqualToString:[LocalUserComponent userModel].uid]) {
         BOOL isFlower = [message containsString:@"鲜花"];
         BOOL isRocket = [message containsString:@"火箭"];
         NSString *imageName = @"";
@@ -326,7 +336,7 @@
         imModel.imageName = imageName;
         imModel.isJoin = NO;
         imModel.message = message;
-        [self.imCompoments addIM:imModel];
+        [self.imComponent addIM:imModel];
     }
 }
 
@@ -363,7 +373,7 @@
 
 - (void)receivedCoHostRefuseWithUser:(LiveUserModel *)invitee {
     NSString *message = @"主播暂时有点事，拒绝了你的邀请";
-    [[ToastComponents shareToastComponents] showWithMessage:message];
+    [[ToastComponent shareToastComponent] showWithMessage:message];
     [self.bottomView updateButtonStatus:LiveRoomItemButtonStatePK touchStatus:LiveRoomItemTouchStatusNone];
 }
 
@@ -375,13 +385,16 @@
 - (void)receivedCoHostJoin:(NSArray<LiveUserModel *> *)userlList
          otherAnchorRoomId:(NSString *)otherRoomId
           otherAnchorToken:(NSString *)otherToken {
-    [self.livePushStreamCompoments close];
-    [self.coHostCompoments showCoHost:self.liveView
+    __weak __typeof(self) wself = self;
+    [self.coHostComponent showCoHost:self.liveView
                         streamPushUrl:self.streamPushUrl
                         userModelList:userlList
                        loginUserModel:self.currentUserModel
                     otherAnchorRoomId:otherRoomId
-                     otherAnchorToken:otherToken];
+                    otherAnchorToken:otherToken
+                       completeBlock:^{
+        [wself.livePushStreamComponent close];
+    }];
     [self.bottomView updateButtonStatus:LiveRoomItemButtonStatePK
                             touchStatus:LiveRoomItemTouchStatusClose];
 }
@@ -389,9 +402,9 @@
 - (void)receivedCoHostEnd {
     if ([self isHost]) {
         NSString *message = @"主播已断开连线";
-        [[ToastComponents shareToastComponents] showWithMessage:message];
-        [self.coHostCompoments closeCoHost];
-        [self.livePushStreamCompoments openWithUserModel:self.currentUserModel];
+        [[ToastComponent shareToastComponent] showWithMessage:message];
+        [self.coHostComponent closeCoHost];
+        [self.livePushStreamComponent openWithUserModel:self.currentUserModel];
         [self.bottomView updateButtonStatus:LiveRoomItemButtonStatePK touchStatus:LiveRoomItemTouchStatusNone];
     }
 }
@@ -464,7 +477,7 @@
 - (void)receivedAddGuestsManageGuestMedia:(NSString *)uid
                                    camera:(NSInteger)camera
                                       mic:(NSInteger)mic {
-    if (![uid isEqualToString:[LocalUserComponents userModel].uid]) {
+    if (![uid isEqualToString:[LocalUserComponent userModel].uid]) {
         return;
     }
     BOOL cameraBool = self.currentUserModel.camera;
@@ -475,19 +488,19 @@
     if (mic != -1) {
         micBool = mic == 1 ? YES : NO;
     }
-    if (self.addGuestsCompoments.isConnect) {
-        [self.addGuestsCompoments updateGuestsCamera:cameraBool uid:uid];
-        [self.addGuestsCompoments updateGuestsMic:micBool uid:uid];
+    if (self.addGuestsComponent.isConnect) {
+        [self.addGuestsComponent updateGuestsCamera:cameraBool uid:uid];
+        [self.addGuestsComponent updateGuestsMic:micBool uid:uid];
         if (camera != -1 && !cameraBool) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"你的摄像头已被主播关闭"];
+            [[ToastComponent shareToastComponent] showWithMessage:@"你的摄像头已被主播关闭"];
         }
         if (mic != -1 && !micBool) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"你已被主播禁麦"];
+            [[ToastComponent shareToastComponent] showWithMessage:@"你已被主播禁麦"];
         }
     }
     self.currentUserModel.camera = cameraBool;
     self.currentUserModel.mic = micBool;
-    [self.settingCompoments refreshGuestSettingView];
+    [self.settingComponent refreshGuestSettingView];
     [LiveRTMManager liveUpdateMediaStatus:self.liveRoomModel.roomID
                                              mic:micBool
                                           camera:cameraBool
@@ -503,9 +516,9 @@
     if (![self isHost]) {
         // Guests update bottom ui
         [self.bottomView updateButtonRoleStatus:BottomRoleStatusGuests];
-        [self.addGuestsCompoments joinRTCRoomByToken:rtcToken
+        [self.addGuestsComponent joinRTCRoomByToken:rtcToken
                                            rtcRoomID:rtcRoomID
-                                              userID:[LocalUserComponents userModel].uid];
+                                              userID:[LocalUserComponent userModel].uid];
     }
 }
 
@@ -513,62 +526,62 @@
     NSString *message = @"";
     if ([self isHost]) {
         message = [NSString stringWithFormat:@"观众%@拒绝连线", invitee.name];
-        [self.addGuestsCompoments updateList];
+        [self.addGuestsComponent updateList];
     } else {
         message = @"主播拒绝和你连线";
         self.currentUserModel.status = LiveInteractStatusOther;
-        [self.addGuestsCompoments closeApply];
+        [self.addGuestsComponent closeApply];
     }
-    [[ToastComponents shareToastComponents] showWithMessage:message];
+    [[ToastComponent shareToastComponent] showWithMessage:message];
 }
 
 - (void)receivedAddGuestsJoin:(NSArray<LiveUserModel *> *)userList {
     if ([self isHost]) {
-        [self.livePushStreamCompoments close];
-        [self.addGuestsCompoments showAddGuests:self.liveView
+        [self.livePushStreamComponent close];
+        [self.addGuestsComponent showAddGuests:self.liveView
                                   streamPushUrl:_streamPushUrl
                                         hostUid:self.liveRoomModel.anchorUserID
                                        userList:userList];
-        [self.addGuestsCompoments updateGuests:userList];
-        [self.addGuestsCompoments updateList];
+        [self.addGuestsComponent updateGuests:userList];
+        [self.addGuestsComponent updateList];
         
         if (userList.count == 2) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"点击观众画面可进行麦位管理"];
+            [[ToastComponent shareToastComponent] showWithMessage:@"点击观众画面可进行麦位管理"];
         }
     } else {
-        [self.livePullStreamCompoments close];
-        [self.addGuestsCompoments showAddGuests:self.liveView
+        [self.livePullStreamComponent close];
+        [self.addGuestsComponent showAddGuests:self.liveView
                                   streamPushUrl:_streamPushUrl
                                         hostUid:self.liveRoomModel.anchorUserID
                                        userList:userList];
-        [self.addGuestsCompoments updateGuests:userList];
+        [self.addGuestsComponent updateGuests:userList];
         [self.bottomView updateButtonRoleStatus:BottomRoleStatusGuests];
         self.currentUserModel.status = LiveInteractStatusAudienceLink;
-        [self.addGuestsCompoments closeApply];
+        [self.addGuestsComponent closeApply];
     }
 }
 
 - (void)receivedAddGuestsRemoveWithUser:(NSString *)uid userList:(NSArray<LiveUserModel *> *)userList {
     if ([self isHost]) {
-        NSString *userName = [self.addGuestsCompoments removeAddGuestsUid:uid userList:userList];
+        NSString *userName = [self.addGuestsComponent removeAddGuestsUid:uid userList:userList];
         if (userName != nil) {
             NSString *message = [NSString stringWithFormat:@"%@断开了与您的连麦", userName];
-            [[ToastComponents shareToastComponents] showWithMessage:message];
+            [[ToastComponent shareToastComponent] showWithMessage:message];
         }
     } else {
-        if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"主播已和你断开连线"];
-            [self.addGuestsCompoments closeAddGuests];
-            [self.addGuestsCompoments closeApply];
-            [self.addGuestsCompoments leaveRTCRoom];
-            [self.livePullStreamCompoments open:self.liveRoomModel];
+        if ([uid isEqualToString:[LocalUserComponent userModel].uid]) {
+            [[ToastComponent shareToastComponent] showWithMessage:@"主播已和你断开连线"];
+            [self.addGuestsComponent closeAddGuests];
+            [self.addGuestsComponent closeApply];
+            [self.addGuestsComponent leaveRTCRoom];
+            [self.livePullStreamComponent open:self.liveRoomModel];
             [self.bottomView updateButtonRoleStatus:BottomRoleStatusAudience];
             self.currentUserModel.status = LiveInteractStatusOther;
         } else {
-            NSString *userName = [self.addGuestsCompoments removeAddGuestsUid:uid userList:userList];
+            NSString *userName = [self.addGuestsComponent removeAddGuestsUid:uid userList:userList];
             if (userName != nil) {
                 NSString *message = [NSString stringWithFormat:@"%@断开了与您的连麦", userName];
-                [[ToastComponents shareToastComponents] showWithMessage:message];
+                [[ToastComponent shareToastComponent] showWithMessage:message];
             }
         }
     }
@@ -576,15 +589,15 @@
 
 - (void)receivedAddGuestsEnd {
     if ([self isHost]) {
-        [self.addGuestsCompoments closeAddGuests];
-        [self.addGuestsCompoments updateList];
-        [self.livePushStreamCompoments openWithUserModel:self.currentUserModel];
+        [self.addGuestsComponent closeAddGuests];
+        [self.addGuestsComponent updateList];
+        [self.livePushStreamComponent openWithUserModel:self.currentUserModel];
     } else {
-        [[ToastComponents shareToastComponents] showWithMessage:@"主播已和你断开连线"];
-        [self.addGuestsCompoments closeAddGuests];
-        [self.addGuestsCompoments closeApply];
-        [self.addGuestsCompoments leaveRTCRoom];
-        [self.livePullStreamCompoments open:self.liveRoomModel];
+        [[ToastComponent shareToastComponent] showWithMessage:@"主播已和你断开连线"];
+        [self.addGuestsComponent closeAddGuests];
+        [self.addGuestsComponent closeApply];
+        [self.addGuestsComponent leaveRTCRoom];
+        [self.livePullStreamComponent open:self.liveRoomModel];
         [self.bottomView updateButtonRoleStatus:BottomRoleStatusAudience];
         self.currentUserModel.status = LiveInteractStatusOther;
     }
@@ -593,16 +606,16 @@
 - (void)receivedLiveEnd:(BOOL)isKick type:(NSString *)type {
     if (!isKick) {
         if ([type integerValue] == 2) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"本次体验时间已超过20mins" delay:0.8];
+            [[ToastComponent shareToastComponent] showWithMessage:@"本次体验时间已超过20mins" delay:0.8];
         } else if ([type integerValue] == 3) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"直播间内容违规，直播间已被关闭" delay:0.8];
+            [[ToastComponent shareToastComponent] showWithMessage:@"直播间内容违规，直播间已被关闭" delay:0.8];
         } else {
             if (![self isHost]) {
-                [[ToastComponents shareToastComponents] showWithMessage:@"主播已关闭直播" delay:0.8];
+                [[ToastComponent shareToastComponent] showWithMessage:@"主播已关闭直播" delay:0.8];
             }
         }
     } else {
-        [[ToastComponents shareToastComponents] showWithMessage:@"相同ID用户已登录，您已被强制下线！" delay:0.8];
+        [[ToastComponent shareToastComponent] showWithMessage:@"相同ID用户已登录，您已被强制下线！" delay:0.8];
     }
     [self navigationControllerPop:isKick];
 }
@@ -610,10 +623,17 @@
 - (void)receivedRoomStatus:(LiveInteractStatus)status {
     self.liveRoomModel.hostUserModel.status = status;
     if (![self isHost]) {
-        // There will be a delay between the screen and the message. At present, this processing method is compatible processing. After that, the push-pull streaming library that can send SEI messages needs to be changed back to SEI to send notifications.
-        SEL selector = @selector(delayUpdatePullStatus:);
-        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:selector object:nil];
-        [self performSelector:selector withObject:@(status) afterDelay:3];
+        // 若接入播放器不支持 SEI
+        // If the connected player does not support SEI
+        if (![[LiveRTCManager shareRtc] isSupportSEI]) {
+            // 视频流和业务消息之间会有时间查，推荐使用视频SEI方案。
+            // 若接入的播放器不支持解析SEI，也可以通过业务状态更新渲染布局
+            // There will be time to check between the video stream and the service message. It is recommended to use the video SEI solution.
+            // If the connected player does not support parsing SEI, the rendering layout can also be updated through the business status
+            SEL selector = @selector(delayUpdatePullStatus:);
+            [NSObject cancelPreviousPerformRequestsWithTarget:self selector:selector object:nil];
+            [self performSelector:selector withObject:@(status) afterDelay:3];
+        }
     }
 }
 
@@ -637,14 +657,14 @@
     } else {
         message = @"嘉宾暂时离开";
     }
-    [[ToastComponents shareToastComponents] showWithMessage:message];
+    [[ToastComponent shareToastComponent] showWithMessage:message];
 }
 
 #pragma mark - Private Action
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [self.settingCompoments close];
-    [self.beautyCompoments close];
+    [self.settingComponent close];
+    [self.beautyComponent close];
 }
 
 - (void)addSubviewAndConstraints {
@@ -675,7 +695,7 @@
         make.width.mas_equalTo(0);
     }];
     
-    [self imCompoments];
+    [self imComponent];
 }
 
 - (void)showEndCoHostAlert {
@@ -704,21 +724,21 @@
         } else if (userModel.status == LiveInteractStatusAudienceLink) {
             // Add Guests
             [self.bottomView updateButtonRoleStatus:BottomRoleStatusHost];
-            [self.addGuestsCompoments showAddGuests:self.liveView
+            [self.addGuestsComponent showAddGuests:self.liveView
                                       streamPushUrl:_streamPushUrl
                                             hostUid:self.liveRoomModel.anchorUserID
                                            userList:rtcUserList];
         } else {
             // None
             [self.bottomView updateButtonRoleStatus:BottomRoleStatusHost];
-            [self.livePushStreamCompoments openWithUserModel:userModel];
-            [self.livePushStreamCompoments updateHostMic:userModel.mic
+            [self.livePushStreamComponent openWithUserModel:userModel];
+            [self.livePushStreamComponent updateHostMic:userModel.mic
                                                   camera:userModel.camera];
-            if (self.addGuestsCompoments.isConnect) {
-                [self.addGuestsCompoments closeAddGuests];
+            if (self.addGuestsComponent.isConnect) {
+                [self.addGuestsComponent closeAddGuests];
             }
-            if (self.coHostCompoments.isConnect) {
-                [self.coHostCompoments closeCoHost];
+            if (self.coHostComponent.isConnect) {
+                [self.coHostComponent closeCoHost];
             }
         }
     } else {
@@ -726,17 +746,17 @@
         if (userModel.status == LiveInteractStatusAudienceLink) {
             // Add Guests
             [self.bottomView updateButtonRoleStatus:BottomRoleStatusGuests];
-            [self.addGuestsCompoments showAddGuests:self.liveView
+            [self.addGuestsComponent showAddGuests:self.liveView
                                       streamPushUrl:_streamPushUrl
                                             hostUid:self.liveRoomModel.anchorUserID
                                            userList:rtcUserList];
         } else {
             // None
             [self.bottomView updateButtonRoleStatus:BottomRoleStatusAudience];
-            [self.livePullStreamCompoments open:self.liveRoomModel];
-            if (self.addGuestsCompoments.isConnect) {
-                [self.addGuestsCompoments closeAddGuests];
-                [self.addGuestsCompoments leaveRTCRoom];
+            [self.livePullStreamComponent open:self.liveRoomModel];
+            if (self.addGuestsComponent.isConnect) {
+                [self.addGuestsComponent closeAddGuests];
+                [self.addGuestsComponent leaveRTCRoom];
             }
         }
     }
@@ -757,7 +777,7 @@
     if (beautyEnable) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             //CV initialization and setting special effects together will cause deadlock, so you need to delay setting special effects
-            [self.beautyCompoments resumeLocalEffect];
+            [self.beautyComponent resumeLocalEffect];
         });
     }
 }
@@ -768,16 +788,16 @@
     __weak __typeof(self) wself = self;
     if (roleStatus == BottomRoleStatusAudience) {
         if (self.liveRoomModel.hostUserModel.status == LiveInteractStatusHostLink) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"主播正在发起双主播连线"];
+            [[ToastComponent shareToastComponent] showWithMessage:@"主播正在发起双主播连线"];
         } else {
-            [self.addGuestsCompoments showApply:self.currentUserModel
+            [self.addGuestsComponent showApply:self.currentUserModel
                                          hostID:self.liveRoomModel.anchorUserID];
         }
     } else if (roleStatus == BottomRoleStatusHost) {
         if ([bottomView getButtonTouchStatus:LiveRoomItemButtonStatePK]) {
-            [[ToastComponents shareToastComponents] showWithMessage:@"正在等待被邀主播的应答"];
+            [[ToastComponent shareToastComponent] showWithMessage:@"正在等待被邀主播的应答"];
         } else {
-            [self.addGuestsCompoments showList:^(LiveAddGuestsDismissState state) {
+            [self.addGuestsComponent showList:^(LiveAddGuestsDismissState state) {
                 if (state == LiveAddGuestsDismissStateCloseConnect) {
                     [wself showCloseAddGuests];
                 }
@@ -799,30 +819,30 @@
         // Waiting for the response from the invited host
     } else {
         // show list view
-        [self.coHostCompoments showInviteList:nil];
+        [self.coHostComponent showInviteList:nil];
     }
 }
 
 - (void)clickBottomSettingWithRoleStatus:(BottomRoleStatus)roleStatus {
     if (roleStatus == BottomRoleStatusHost) {
-        if (self.addGuestsCompoments.isConnect || self.coHostCompoments.isConnect) {
-            [self.settingCompoments showWithType:LiveRoomSettingTypeHostChat
+        if (self.addGuestsComponent.isConnect || self.coHostComponent.isConnect) {
+            [self.settingComponent showWithType:LiveRoomSettingTypeHostChat
                                    fromSuperView:self.view
                                           roomID:self.liveRoomModel
                                        userModel:self.currentUserModel];
         } else {
-            [self.settingCompoments showWithType:LiveRoomSettingTypeHostLiving
+            [self.settingComponent showWithType:LiveRoomSettingTypeHostLiving
                                    fromSuperView:self.view
                                           roomID:self.liveRoomModel
                                        userModel:self.currentUserModel];
         }
     } else if (roleStatus == BottomRoleStatusGuests) {
-        [self.settingCompoments showWithType:LiveRoomSettingTypeGuest
+        [self.settingComponent showWithType:LiveRoomSettingTypeGuest
                                fromSuperView:self.view
                                       roomID:self.liveRoomModel
                                    userModel:self.currentUserModel];
     } else if (roleStatus == BottomRoleStatusAudience) {
-        [self.settingCompoments showWithType:LiveRoomSettingTypeAudience
+        [self.settingComponent showWithType:LiveRoomSettingTypeAudience
                                fromSuperView:self.view
                                       roomID:self.liveRoomModel
                                    userModel:nil];
@@ -863,7 +883,7 @@
         AlertActionModel *alertCancelModel = [[AlertActionModel alloc] init];
         alertCancelModel.title = @"取消";
         
-        NSString *message = [NSString stringWithFormat:@"正在与%ld位观众连线，是否确认关闭观众连线？", (long)self.addGuestsCompoments.guestList.count];
+        NSString *message = [NSString stringWithFormat:@"正在与%ld位观众连线，是否确认关闭观众连线？", (long)self.addGuestsComponent.guestList.count];
         [[AlertActionManager shareAlertActionManager] showWithMessage:message actions:@[ alertCancelModel, alertModel ]];
     } else {
         __weak __typeof(self) wself = self;
@@ -890,7 +910,7 @@
                                rtcUserList:@[]];
     } else {
         [self loadDataWithJoinLiveRoom];
-        [self.livePullStreamCompoments open:self.liveRoomModel];
+        [self.livePullStreamComponent open:self.liveRoomModel];
     }
 }
 
@@ -901,21 +921,20 @@
     self.currentUserModel = userModel;
     
     // All join RTS room
-    [[LiveRTCManager shareRtc] joinMultiRoomByToken:roomModel.rtmToken
-                                             roomID:roomModel.roomID
-                                             userID:[LocalUserComponents userModel].uid];
+    [[LiveRTCManager shareRtc] joinMultiRTSRoomByToken:roomModel.rtmToken
+                                                roomID:roomModel.roomID
+                                                userID:[LocalUserComponent userModel].uid];
     
     // Host join RTC room
     if ([self isHost]) {
         [[LiveRTCManager shareRtc] joinRTCRoomByToken:roomModel.rtcToken
                                              rtcRoomID:roomModel.rtcRoomId
-                                               userID:[LocalUserComponents userModel].uid];
+                                               userID:[LocalUserComponent userModel].uid];
     }
     // Join RTS/RTC room callback
     __weak __typeof(self) wself = self;
     [LiveRTCManager shareRtc].rtcJoinRoomBlock = ^(NSString * _Nonnull roomId, NSInteger errorCode, NSInteger joinType) {
-        if ([roomId isEqualToString:roomModel.rtcRoomId] &&
-            errorCode == 0) {
+        if (errorCode == 0) {
             [wself joinRTCRoomResults:joinType];
         }
     };
@@ -930,7 +949,7 @@
                        camera:roomModel.hostUserModel.camera
                           mic:roomModel.hostUserModel.mic];
     
-    // update Res
+    // Update Res
     [self loadDataWithupdateRes:self.currentUserModel];
 }
 
@@ -951,7 +970,7 @@
 }
 
 - (BOOL)isHost {
-    return [self.liveRoomModel.anchorUserID isEqualToString:[LocalUserComponents userModel].uid];
+    return [self.liveRoomModel.anchorUserID isEqualToString:[LocalUserComponent userModel].uid];
 }
 
 - (void)hangUp {
@@ -1005,7 +1024,7 @@
             // co-host
             pullStatus = PullRenderStatusCoHst;
         }
-        [self.livePullStreamCompoments updateWithStatus:pullStatus];
+        [self.livePullStreamComponent updateWithStatus:pullStatus];
     }
 }
 
@@ -1015,28 +1034,28 @@
     if ([uid isEqualToString:self.liveRoomModel.anchorUserID]) {
         self.liveRoomModel.hostUserModel.camera = camera;
         self.liveRoomModel.hostUserModel.mic = mic;
-        if (self.livePushStreamCompoments.isConnect) {
-            [self.livePushStreamCompoments updateHostMic:mic camera:camera];
+        if (self.livePushStreamComponent.isConnect) {
+            [self.livePushStreamComponent updateHostMic:mic camera:camera];
         }
-        if (self.livePullStreamCompoments.isConnect) {
-            [self.livePullStreamCompoments updateHostMic:mic camera:camera];
+        if (self.livePullStreamComponent.isConnect) {
+            [self.livePullStreamComponent updateHostMic:mic camera:camera];
         }
     }
-    if (self.addGuestsCompoments.isConnect) {
-        [self.addGuestsCompoments updateGuestsCamera:camera uid:uid];
-        [self.addGuestsCompoments updateGuestsMic:mic uid:uid];
+    if (self.addGuestsComponent.isConnect) {
+        [self.addGuestsComponent updateGuestsCamera:camera uid:uid];
+        [self.addGuestsComponent updateGuestsMic:mic uid:uid];
         if ([self isHost]) {
-            [self.addGuestsCompoments closeSheet:uid];
+            [self.addGuestsComponent closeSheet:uid];
         }
     }
-    if (self.coHostCompoments.isConnect) {
-        [self.coHostCompoments updateGuestsMic:mic uid:uid];
-        [self.coHostCompoments updateGuestsCamera:camera uid:uid];
+    if (self.coHostComponent.isConnect) {
+        [self.coHostComponent updateGuestsMic:mic uid:uid];
+        [self.coHostComponent updateGuestsCamera:camera uid:uid];
     }
-    if ([uid isEqualToString:[LocalUserComponents userModel].uid]) {
+    if ([uid isEqualToString:[LocalUserComponent userModel].uid]) {
         self.currentUserModel.mic = mic;
         self.currentUserModel.camera = camera;
-        [self.settingCompoments refreshGuestSettingView];
+        [self.settingComponent refreshGuestSettingView];
     }
 }
 
@@ -1070,11 +1089,11 @@
     return _bottomView;
 }
 
-- (LiveIMCompoments *)imCompoments {
-    if (!_imCompoments) {
-        _imCompoments = [[LiveIMCompoments alloc] initWithSuperView:self.view];
+- (LiveIMComponent *)imComponent {
+    if (!_imComponent) {
+        _imComponent = [[LiveIMComponent alloc] initWithSuperView:self.view];
     }
-    return _imCompoments;
+    return _imComponent;
 }
 
 - (UIView *)liveView {
@@ -1084,50 +1103,50 @@
     return _liveView;
 }
 
-- (LiveCoHostCompoments *)coHostCompoments {
-    if (!_coHostCompoments) {
-        _coHostCompoments = [[LiveCoHostCompoments alloc] initWithRoomID:self.liveRoomModel];
+- (LiveCoHostComponent *)coHostComponent {
+    if (!_coHostComponent) {
+        _coHostComponent = [[LiveCoHostComponent alloc] initWithRoomID:self.liveRoomModel];
     }
-    return _coHostCompoments;
+    return _coHostComponent;
 }
 
-- (LiveAddGuestsCompoments *)addGuestsCompoments {
-    if (!_addGuestsCompoments) {
-        _addGuestsCompoments = [[LiveAddGuestsCompoments alloc]
+- (LiveAddGuestsComponent *)addGuestsComponent {
+    if (!_addGuestsComponent) {
+        _addGuestsComponent = [[LiveAddGuestsComponent alloc]
                                 initWithRoomID:self.liveRoomModel];
     }
-    return _addGuestsCompoments;
+    return _addGuestsComponent;
 }
 
-- (LivePushStreamCompoments *)livePushStreamCompoments {
-    if (!_livePushStreamCompoments) {
-        _livePushStreamCompoments = [[LivePushStreamCompoments alloc]
+- (LivePushStreamComponent *)livePushStreamComponent {
+    if (!_livePushStreamComponent) {
+        _livePushStreamComponent = [[LivePushStreamComponent alloc]
                                      initWithSuperView:self.liveView
                                      roomModel:self.liveRoomModel
                                      streamPushUrl:self.streamPushUrl];
     }
-    return _livePushStreamCompoments;
+    return _livePushStreamComponent;
 }
 
-- (LivePullStreamCompoments *)livePullStreamCompoments {
-    if (!_livePullStreamCompoments) {
-        _livePullStreamCompoments = [[LivePullStreamCompoments alloc] initWithSuperView:self.liveView];
+- (LivePullStreamComponent *)livePullStreamComponent {
+    if (!_livePullStreamComponent) {
+        _livePullStreamComponent = [[LivePullStreamComponent alloc] initWithSuperView:self.liveView];
     }
-    return _livePullStreamCompoments;
+    return _livePullStreamComponent;
 }
 
-- (LiveRoomSettingCompoments *)settingCompoments {
-    if (!_settingCompoments) {
-        _settingCompoments = [[LiveRoomSettingCompoments alloc] init];
+- (LiveRoomSettingComponent *)settingComponent {
+    if (!_settingComponent) {
+        _settingComponent = [[LiveRoomSettingComponent alloc] init];
     }
-    return _settingCompoments;
+    return _settingComponent;
 }
 
-- (BytedEffectProtocol *)beautyCompoments {
-    if (!_beautyCompoments) {
-        _beautyCompoments = [[BytedEffectProtocol alloc] initWithRTCEngineKit:[LiveRTCManager shareRtc].rtcEngineKit];
+- (BytedEffectProtocol *)beautyComponent {
+    if (!_beautyComponent) {
+        _beautyComponent = [[BytedEffectProtocol alloc] initWithRTCEngineKit:[LiveRTCManager shareRtc].rtcEngineKit];
     }
-    return _beautyCompoments;
+    return _beautyComponent;
 }
 
 #pragma mark - Gift
@@ -1147,19 +1166,19 @@
 
 - (void)senderGift:(NSString *)imageName {
     NSString *title = [imageName isEqualToString:@"flower"] ? @"鲜花" : @"火箭";
-    NSString *message = [NSString stringWithFormat:@"%@送出%@", [LocalUserComponents userModel].name, title];
+    NSString *message = [NSString stringWithFormat:@"%@送出%@", [LocalUserComponent userModel].name, title];
     
     // Local display
     LiveIMModel *imModel = [[LiveIMModel alloc] init];
     imModel.imageName = imageName;
     imModel.isJoin = NO;
     imModel.message = message;
-    [self.imCompoments addIM:imModel];
+    [self.imComponent addIM:imModel];
     
     // Send to the room
     [LiveRTMManager sendIMMessage:message block:^(RTMACKModel * _Nonnull model) {
         if (!model.result) {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
     }];
     
@@ -1244,7 +1263,7 @@
 - (void)dealloc {
     [UIApplication sharedApplication].idleTimerDisabled = NO;
     [[LiveRTCManager shareRtc] leaveLiveRoom];
-    [self.livePullStreamCompoments close];
+    [self.livePullStreamComponent close];
 }
 
 @end

@@ -1,9 +1,9 @@
 package com.volcengine.vertcdemo.interactivelive.bean;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizResponse;
 
-public class JoinLiveRoomResponse implements RTMBizResponse {
+public class JoinLiveRoomResponse implements RTSBizResponse {
 
     @SerializedName("user_info")
     public LiveUserInfo liveUserInfo;

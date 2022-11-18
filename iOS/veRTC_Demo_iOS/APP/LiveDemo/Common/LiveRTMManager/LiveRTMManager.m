@@ -2,11 +2,12 @@
 //  LiveRTMManager.m
 //  SceneRTCDemo
 //
-//  Created by bytedance on 2021/3/16.
+//  Created by on 2021/3/16.
 //
 
 #import "LiveRTMManager.h"
 #import "LiveRTCManager.h"
+#import "JoinRTSParams.h"
 #import "Core.h"
 
 @implementation LiveRTMManager
@@ -20,9 +21,9 @@
                                  RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(userName)) {
-        dic = @{@"user_name" : userName};
+        dic = @{@"user_name" : userName ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveCreateLive"with:dic block:^(RTMACKModel * _Nonnull ackModel) {
         LiveRoomInfoModel *roomModel = nil;
         LiveUserModel *hostUserModel = nil;
@@ -46,9 +47,9 @@
                                 RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveStartLive"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -67,9 +68,9 @@
                           block:(void (^)(NSArray<LiveUserModel *> *, RTMACKModel *))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveGetActiveAnchorList"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -94,9 +95,9 @@
                                       RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveGetAudienceList"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -123,15 +124,15 @@
                          mic:(NSInteger)mic
                       camera:(NSInteger)camera
                        block:(void (^)(RTMACKModel * _Nonnull))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"host_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"host_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"host_user_id"];
     }
     if (NOEmptyStr(guestRoomID)) {
         [dic setValue:guestRoomID forKey:@"guest_room_id"];
@@ -154,9 +155,9 @@
                  block:(void (^)(RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveFinishLive"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -173,15 +174,15 @@
                    audienceUserID:(NSString *)audienceUserID
                             extra:(NSString *)extra
                             block:(void (^)(NSString * _Nullable, RTMACKModel * _Nonnull))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"host_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"host_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"host_user_id"];
     }
     if (NOEmptyStr(audienceRoomID)) {
         [dic setValue:audienceRoomID forKey:@"audience_room_id"];
@@ -214,15 +215,15 @@
                                             NSString *,
                                             NSArray<LiveUserModel *> *,
                                             RTMACKModel *))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"host_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"host_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"host_user_id"];
     }
     if (NOEmptyStr(audienceRoomID)) {
         [dic setValue:audienceRoomID forKey:@"audience_room_id"];
@@ -263,15 +264,15 @@
                  audienceRoomID:(NSString *)audienceRoomID
                  audienceUserID:(NSString *)audienceUserID
                           block:(void (^)(RTMACKModel * _Nonnull))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"host_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"host_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"host_user_id"];
     }
     if (NOEmptyStr(audienceRoomID)) {
         [dic setValue:audienceRoomID forKey:@"audience_room_id"];
@@ -291,9 +292,9 @@
 + (void)liveAudienceLinkmicFinish:(NSString *)roomID block:(void (^)(RTMACKModel * _Nonnull))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id": roomID};
+        dic = @{@"room_id": roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveAudienceLinkmicFinish"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -308,15 +309,15 @@
                   inviteeUserID:(NSString *)inviteeUserID
                           extra:(NSString *)extra
                           block:(void (^)(NSString * _Nullable, RTMACKModel * _Nonnull))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"inviter_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"inviter_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"inviter_user_id"];
     }
     if (NOEmptyStr(inviteeRoomID)) {
         [dic setValue:inviteeRoomID forKey:@"invitee_room_id"];
@@ -349,15 +350,15 @@
                                          NSString *,
                                          NSArray<LiveUserModel *> *,
                                          RTMACKModel *))block {
-    NSMutableDictionary *dic = [[PublicParameterCompoments addTokenToParams:nil] mutableCopy];
-    if (NOEmptyStr([LocalUserComponents userModel].loginToken)) {
-        [dic setValue:[LocalUserComponents userModel].loginToken forKey:@"login_token"];
+    NSMutableDictionary *dic = [[JoinRTSParams addTokenToParams:nil] mutableCopy];
+    if (NOEmptyStr([LocalUserComponent userModel].loginToken)) {
+        [dic setValue:[LocalUserComponent userModel].loginToken forKey:@"login_token"];
     }
     if (NOEmptyStr(roomID)) {
         [dic setValue:roomID forKey:@"invitee_room_id"];
     }
-    if (NOEmptyStr([LocalUserComponents userModel].uid)) {
-        [dic setValue:[LocalUserComponents userModel].uid forKey:@"invitee_user_id"];
+    if (NOEmptyStr([LocalUserComponent userModel].uid)) {
+        [dic setValue:[LocalUserComponent userModel].uid forKey:@"invitee_user_id"];
     }
     if (NOEmptyStr(inviterRoomID)) {
         [dic setValue:inviterRoomID forKey:@"inviter_room_id"];
@@ -399,11 +400,11 @@
                           block:(void (^)(RTMACKModel * _Nonnull))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id": roomID,
-                @"linker_id": linkerID
+        dic = @{@"room_id": roomID ?: @"",
+                @"linker_id": linkerID ?: @""
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveAnchorLinkmicFinish"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -421,10 +422,10 @@
                                    RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID,
-                @"user_name" : [LocalUserComponents userModel].name};
+        dic = @{@"room_id" : roomID ?: @"",
+                @"user_name" : [LocalUserComponent userModel].name};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveJoinLiveRoom"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -446,9 +447,9 @@
                     block:(void (^)(RTMACKModel *model))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveLeaveLiveRoom"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -465,9 +466,9 @@
                            block:(void (^)(NSString * _Nullable, RTMACKModel * _Nonnull))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id" : roomID};
+        dic = @{@"room_id" : roomID ?: @""};
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveAudienceLinkmicApply"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -488,12 +489,12 @@
                            block:(void (^)(NSString * _Nullable, NSString * _Nullable, NSArray<LiveUserModel *> * _Nullable, RTMACKModel * _Nonnull))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id": roomID,
-                @"linker_id": linkerID,
+        dic = @{@"room_id": roomID ?: @"",
+                @"linker_id": linkerID ?: @"",
                 @"reply_type": @(replyType)
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveAudienceLinkmicReply"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -525,11 +526,11 @@
                            block:(void (^)(RTMACKModel * _Nonnull))block {
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
-        dic = @{@"room_id": roomID,
-                @"linker_id": linkerID
+        dic = @{@"room_id": roomID ?: @"",
+                @"linker_id": linkerID ?: @""
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveAudienceLinkmicLeave"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -550,9 +551,9 @@
     NSDictionary *dic = @{
         @"width" : @(videoSize.width),
         @"height" : @(videoSize.height),
-        @"room_id" : roomID,
+        @"room_id" : roomID ?: @"",
     };
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveUpdateResolution"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -563,7 +564,7 @@
 }
 
 + (void)liveClearUserWithBlock:(void (^)(RTMACKModel *model))block {
-    NSDictionary *dic = [PublicParameterCompoments addTokenToParams:nil];
+    NSDictionary *dic = [JoinRTSParams addTokenToParams:nil];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveClearUser"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -576,7 +577,7 @@
 
 + (void)liveGetActiveLiveRoomListWithBlock:(void (^)(NSArray<LiveRoomInfoModel *> *roomList,
                                                      RTMACKModel *model))block {
-    NSDictionary *dic = [PublicParameterCompoments addTokenToParams:nil];
+    NSDictionary *dic = [JoinRTSParams addTokenToParams:nil];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveGetActiveLiveRoomList"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -604,12 +605,12 @@
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
         dic = @{
-            @"room_id" : roomID,
+            @"room_id" : roomID ?: @"",
             @"mic" : @(mic),
             @"camera" : @(camera),
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     [[LiveRTCManager shareRtc] emitWithAck:@"liveUpdateMediaStatus"
                                       with:dic
                                      block:^(RTMACKModel * _Nonnull ackModel) {
@@ -625,10 +626,10 @@
     NSDictionary *dic = @{};
     if (NOEmptyStr(message)) {
         dic = @{
-            @"message" : message,
+            @"message" : message ?: @"",
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     
     [[LiveRTCManager shareRtc] emitWithAck:@"liveSendMessage"
                                       with:dic
@@ -647,10 +648,10 @@
     NSDictionary *dic = @{};
     if (NOEmptyStr(roomID)) {
         dic = @{
-            @"room_id" : roomID,
+            @"room_id" : roomID ?: @"",
         };
     }
-    dic = [PublicParameterCompoments addTokenToParams:dic];
+    dic = [JoinRTSParams addTokenToParams:dic];
     
     [[LiveRTCManager shareRtc] emitWithAck:@"liveReconnect"
                                       with:dic

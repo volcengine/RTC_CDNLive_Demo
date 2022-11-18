@@ -2,16 +2,16 @@
 //  LiveHostAvatarView.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/19.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/19.
+//  
 //
 
 #import "LiveHostAvatarView.h"
-#import "LiveAvatarCompoments.h"
+#import "LiveAvatarComponent.h"
 
 @interface LiveHostAvatarView ()
 
-@property (nonatomic, strong) LiveAvatarCompoments *avatarView;
+@property (nonatomic, strong) LiveAvatarComponent *avatarView;
 @property (nonatomic, strong) UILabel *titleLabel;
 
 @end
@@ -59,9 +59,9 @@
     return _titleLabel;
 }
 
-- (LiveAvatarCompoments *)avatarView {
+- (LiveAvatarComponent *)avatarView {
     if (_avatarView == nil) {
-        _avatarView = [[LiveAvatarCompoments alloc] init];
+        _avatarView = [[LiveAvatarComponent alloc] init];
         _avatarView.layer.masksToBounds = YES;
         _avatarView.layer.cornerRadius = 16;
         _avatarView.fontSize = 16;

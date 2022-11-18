@@ -2,6 +2,7 @@ package com.volcengine.vertcdemo.interactivelive.core;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.text.TextUtils;
 import android.view.Surface;
 import android.view.TextureView;
 
@@ -49,6 +50,9 @@ public class LivePlayerManager {
     }
 
     public void playLive(String url) {
+        if (TextUtils.equals(url, mSourcePath)) {
+            return;
+        }
         mSourcePath = url;
         load();
     }

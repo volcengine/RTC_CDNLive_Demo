@@ -25,11 +25,12 @@ import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.core.LiveRTCManager;
 import com.volcengine.vertcdemo.interactivelive.event.MediaChangedEvent;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-public class AudienceSettingDialog extends BaseDialog implements View.OnClickListener {
+public class AudienceSettingDialog extends BaseDialog {
 
     private ImageView mBackArrow;
     private ImageView mResolutionBtn;
@@ -55,15 +56,15 @@ public class AudienceSettingDialog extends BaseDialog implements View.OnClickLis
         super.onCreate(savedInstanceState);
 
         mBackArrow = findViewById(R.id.back_iv);
-        mBackArrow.setOnClickListener(this);
+        mBackArrow.setOnClickListener(DebounceClickListener.create(this::onClick));
         mTitle = findViewById(R.id.dialog_title);
-        mTitle.setOnClickListener(this);
+        mTitle.setOnClickListener(DebounceClickListener.create(this::onClick));
         mTitle.setText("设置");
         mSettingItems = findViewById(R.id.setting_items_layout);
-        mSettingItems.setOnClickListener(this);
+        mSettingItems.setOnClickListener(DebounceClickListener.create(this::onClick));
         mResolutionLayout = findViewById(R.id.resolution_layout);
         setResolutionChecked();
-        mResolutionLayout.setOnClickListener(this);
+        mResolutionLayout.setOnClickListener(DebounceClickListener.create(this::onClick));
         mResolutionLayout.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.resolution_540) {
                 LiveRTCManager.ins().setPlayLiveStreamResolution(RESO540);
@@ -74,13 +75,13 @@ public class AudienceSettingDialog extends BaseDialog implements View.OnClickLis
             }
         });
         mResolutionBtn = findViewById(R.id.resolution_iv);
-        mResolutionBtn.setOnClickListener(this);
+        mResolutionBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mSwitchCameraBtn = findViewById(R.id.switch_camera_iv);
-        mSwitchCameraBtn.setOnClickListener(this);
+        mSwitchCameraBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mMicBtn = findViewById(R.id.mic_iv);
-        mMicBtn.setOnClickListener(this);
+        mMicBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mCameraBtn = findViewById(R.id.camera_iv);
-        mCameraBtn.setOnClickListener(this);
+        mCameraBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         updateButtonStatusByRole();
     }
 
@@ -124,8 +125,7 @@ public class AudienceSettingDialog extends BaseDialog implements View.OnClickLis
         }
     }
 
-    @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         if (v == mResolutionBtn) {
             mSettingItems.setVisibility(View.GONE);
             mResolutionLayout.setVisibility(View.VISIBLE);
@@ -165,7 +165,7 @@ public class AudienceSettingDialog extends BaseDialog implements View.OnClickLis
         if (!TextUtils.isEmpty(mRoomId)) {
             int micStatus = LiveRTCManager.ins().isMicOn() ? MEDIA_STATUS_ON : MEDIA_STATUS_OFF;
             int cameraStatus = LiveRTCManager.ins().isCameraOn() ? MEDIA_STATUS_ON : MEDIA_STATUS_OFF;
-            LiveRTCManager.ins().getRTMClient().updateMediaStatus(mRoomId, micStatus, cameraStatus, null);
+            LiveRTCManager.ins().getRTSClient().updateMediaStatus(mRoomId, micStatus, cameraStatus, null);
         }
     }
 

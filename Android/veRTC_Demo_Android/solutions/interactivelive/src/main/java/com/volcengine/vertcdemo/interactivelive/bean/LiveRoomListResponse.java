@@ -1,11 +1,11 @@
 package com.volcengine.vertcdemo.interactivelive.bean;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizResponse;
 
 import java.util.List;
 
-public class LiveRoomListResponse implements RTMBizResponse {
+public class LiveRoomListResponse implements RTSBizResponse {
 
     @SerializedName("live_room_list")
     public List<LiveRoomInfo> liveRoomList;

@@ -10,12 +10,12 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.volcengine.vertcdemo.interactivelive.R;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class LiveChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private final List<CharSequence> mMsgList = new LinkedList<>();
+    private final List<CharSequence> mMsgList = new ArrayList<>();
 
     @NonNull
     @Override

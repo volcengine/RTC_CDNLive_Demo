@@ -3,7 +3,6 @@ package com.volcengine.vertcdemo.interactivelive.view;
 import android.content.Context;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -13,6 +12,7 @@ import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.event.InviteAudienceEvent;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -20,7 +20,7 @@ import org.greenrobot.eventbus.ThreadMode;
 /**
  * 观众申请上麦
  */
-public class RequestInteractDialog extends BaseDialog implements View.OnClickListener {
+public class RequestInteractDialog extends BaseDialog {
 
     private final long mLastApplyTs;
     private Button mRequestConnectBtn;
@@ -42,7 +42,10 @@ public class RequestInteractDialog extends BaseDialog implements View.OnClickLis
         mRequestConnectBtn = findViewById(R.id.request_interact_btn);
         mWaitHostResponseTv = findViewById(R.id.wait_host_response_tv);
 
-        mRequestConnectBtn.setOnClickListener(this);
+        mRequestConnectBtn.setOnClickListener(DebounceClickListener.create(v -> {
+            listener.onClick();
+            dismiss();
+        }));
 
         updateButton(mLastApplyTs);
     }
@@ -81,14 +84,6 @@ public class RequestInteractDialog extends BaseDialog implements View.OnClickLis
             mRequestConnectBtn.setText("申请中");
             mRequestConnectBtn.setAlpha(0.5f);
         } else {
-            dismiss();
-        }
-    }
-
-    @Override
-    public void onClick(View v) {
-        if (v == mRequestConnectBtn) {
-            listener.onClick();
             dismiss();
         }
     }

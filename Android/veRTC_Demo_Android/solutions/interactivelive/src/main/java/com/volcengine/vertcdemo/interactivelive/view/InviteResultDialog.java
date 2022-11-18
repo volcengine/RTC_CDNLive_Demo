@@ -6,10 +6,12 @@ import android.os.Handler;
 import android.os.Looper;
 
 import com.ss.video.rtc.demo.basic_module.ui.CommonDialog;
+import com.volcengine.vertcdemo.common.SolutionCommonDialog;
+import com.volcengine.vertcdemo.interactivelive.R;
 
 import java.lang.ref.WeakReference;
 
-public final class InviteResultDialog extends CommonDialog {
+public final class InviteResultDialog extends SolutionCommonDialog {
 
     private static final int AUTO_HIDE_DELAY_MS = 4000;
     public static boolean sHasInstanceShowing = false;
@@ -17,6 +19,8 @@ public final class InviteResultDialog extends CommonDialog {
 
     public InviteResultDialog(Context context) {
         super(context);
+        setPositiveBtnText(R.string.live_interact_accept);
+        setNegativeBtnText(R.string.live_interact_reject);
     }
 
     @Override

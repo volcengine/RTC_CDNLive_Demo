@@ -1,9 +1,9 @@
 package com.volcengine.vertcdemo.interactivelive.event;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizInform;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizInform;
 
-public class LiveRoomUserEvent implements RTMBizInform {
+public class LiveRoomUserEvent implements RTSBizInform {
 
     public boolean isJoin;
     @SerializedName("audience_user_id")

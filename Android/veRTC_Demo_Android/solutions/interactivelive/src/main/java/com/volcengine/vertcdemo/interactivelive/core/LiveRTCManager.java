@@ -1,27 +1,21 @@
 package com.volcengine.vertcdemo.interactivelive.core;
 
-import static com.ss.bytertc.engine.RTCEngine.RemoteUserPriority.REMOTE_USER_PRIORITY_HIGH;
-import static com.ss.bytertc.engine.RTCEngine.SubscribeMediaType.RTC_SUBSCRIBE_MEDIA_TYPE_AUDIO_AND_VIDEO;
-import static com.ss.bytertc.engine.RTCEngine.SubscribeMediaType.RTC_SUBSCRIBE_MEDIA_TYPE_VIDEO_ONLY;
 import static com.ss.bytertc.engine.VideoCanvas.RENDER_MODE_HIDDEN;
-import static com.volcengine.vertcdemo.utils.FileUtils.copyAssetFolder;
 
+import android.content.Context;
 import android.text.TextUtils;
 import android.util.Log;
-import android.util.Pair;
 import android.view.TextureView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.StringDef;
 
-import com.ss.bytertc.engine.IRTCRoom;
-import com.ss.bytertc.engine.MultiRoomConfig;
-import com.ss.bytertc.engine.RTCEngine;
+import com.ss.bytertc.engine.RTCRoom;
 import com.ss.bytertc.engine.RTCRoomConfig;
-import com.ss.bytertc.engine.SubscribeVideoConfig;
+import com.ss.bytertc.engine.RTCVideo;
 import com.ss.bytertc.engine.UserInfo;
 import com.ss.bytertc.engine.VideoCanvas;
-import com.ss.bytertc.engine.VideoStreamDescription;
+import com.ss.bytertc.engine.VideoEncoderConfig;
 import com.ss.bytertc.engine.data.CameraId;
 import com.ss.bytertc.engine.data.ForwardStreamEventInfo;
 import com.ss.bytertc.engine.data.ForwardStreamInfo;
@@ -33,14 +27,17 @@ import com.ss.bytertc.engine.live.ByteRTCStreamMixingType;
 import com.ss.bytertc.engine.live.ByteRTCTranscoderErrorCode;
 import com.ss.bytertc.engine.live.ILiveTranscodingObserver;
 import com.ss.bytertc.engine.live.LiveTranscoding;
+import com.ss.bytertc.engine.type.ChannelProfile;
+import com.ss.bytertc.engine.type.MediaStreamType;
+import com.ss.bytertc.engine.type.NetworkQualityStats;
 import com.ss.bytertc.engine.video.VideoCaptureConfig;
-import com.ss.video.rtc.demo.basic_module.utils.AppExecutors;
 import com.ss.video.rtc.demo.basic_module.utils.SafeToast;
 import com.ss.video.rtc.demo.basic_module.utils.Utilities;
 import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
-import com.volcengine.vertcdemo.core.net.rtm.RTCEventHandlerWithRTM;
-import com.volcengine.vertcdemo.core.net.rtm.RtmInfo;
+import com.volcengine.vertcdemo.core.net.rts.RTCRoomEventHandlerWithRTS;
+import com.volcengine.vertcdemo.core.net.rts.RTCVideoEventHandlerWithRTS;
+import com.volcengine.vertcdemo.core.net.rts.RTSInfo;
 import com.volcengine.vertcdemo.interactivelive.event.MediaChangedEvent;
 import com.volcengine.vertcdemo.interactivelive.event.NetworkConnectEvent;
 import com.volcengine.vertcdemo.interactivelive.event.NetworkQualityEvent;
@@ -48,11 +45,6 @@ import com.volcengine.vertcdemo.interactivelive.event.UpdatePullStreamEvent;
 
 import org.webrtc.VideoFrame;
 
-import java.io.File;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,17 +55,22 @@ public class LiveRTCManager {
 
     private static final String TAG = "LiveRTCManager";
 
-    private boolean mIsCameraOn = true;
-    private boolean mIsMicOn = true;
-    private boolean mIsFront = true;
-    private boolean mIsClientTranscoding = false;
-    private boolean mIsTranscoding = false;
-    private int mFrameRate = 15;
-    private int mFrameWidth = 720;
-    private int mFrameHeight = 1280;
-    private int mBitrate = 1600;
+    private boolean mIsCameraOn = true; // 本地摄像头状态
+    private boolean mIsMicOn = true; // 本地麦克风状态
+    private boolean mIsFront = true; // 是否是前置摄像头
+    private boolean mIsClientTranscoding = false; // 是否是客户端合流转推
+    private boolean mIsTranscoding = false; // 是否正在推流
+    private boolean mIsPk = false; // 是否正在pk
 
-    private final ArrayList<String> mEffectPathList = new ArrayList<>();
+    private LiveTranscoding mLiveTranscoding = null; // 合流转推参数
+
+    // 主播的视频采集设置
+    private final LiveSettingConfig mHostConfig = new LiveSettingConfig(
+            720, 1280, 15, 1600);
+
+    // 嘉宾的视频采集设置
+    private final LiveSettingConfig mGuestConfig = new LiveSettingConfig(
+            256, 256, 15, 124);
 
     private String mPlayLiveResolution = RESO720;
     private final HashSet<String> mPlayLiveResolutionSet = new HashSet<String>() {{
@@ -92,37 +89,20 @@ public class LiveRTCManager {
     public static final String RESO720 = "720";
     public static final String RESO1080 = "1080";
 
-    private RTCEngine mEngine;
-    private LiveRtmClient mRTMClient;
-    private RtmInfo mRTMInfo;
+    private RTCVideo mRTCVideo; // RTC引擎
+    private RTCRoom mRTCRoom; // RTC 房间对象
+    private LiveRTSClient mRTSClient;
+    private String mRoomId; // RTC 房间ID
+
     private static LiveRTCManager sInstance = new LiveRTCManager();
 
-    private final Map<String, TextureView> mUidViewMap = new HashMap<>();
+    private final Map<String, TextureView> mUidViewMap = new HashMap<>(); // 用户对应的RTC渲染view
 
-    private final RTCEventHandlerWithRTM mIRTCEngineEventHandler = new RTCEventHandlerWithRTM() {
+    private RTCRoom mRTSRoom = null; // RTS对象，用来实现长链接
+    // RTS 长链接回调
+    private final RTCRoomEventHandlerWithRTS mRTSRoomEventHandler = new RTCRoomEventHandlerWithRTS() {};
 
-        @Override
-        public void onRoomStateChanged(String roomId, String uid, int state, String extraInfo) {
-            super.onRoomStateChanged(roomId, uid, state, extraInfo);
-            Log.d(TAG, String.format("onRoomStateChanged: %s, %s, %d, %s", roomId, uid, state, extraInfo));
-
-            if (isFirstJoinRoomSuccess(state, extraInfo)) {
-                if (mSingleLiveInfo != null) {
-                    LiveRTCManager.ins().startLiveTranscoding(roomId, uid, mSingleLiveInfo.pushUrl);
-                }
-            }
-        }
-
-        @Override
-        public void onUserJoined(UserInfo userInfo, int elapsed) {
-            super.onUserJoined(userInfo, elapsed);
-            String uid = userInfo.getUid();
-            Log.d(TAG, String.format("onUserJoined : uid: %s ", uid));
-            if (!TextUtils.isEmpty(uid)) {
-                TextureView renderView = getUserRenderView(uid);
-                setRemoteVideoView(uid, renderView);
-            }
-        }
+    private final RTCVideoEventHandlerWithRTS mRTCVideoEventHandler = new RTCVideoEventHandlerWithRTS() {
 
         @Override
         public void onWarning(int warn) {
@@ -134,84 +114,6 @@ public class LiveRTCManager {
             super.onError(err);
         }
 
-        @Override
-        public void onLocalStreamStats(LocalStreamStats stats) {
-            super.onLocalStreamStats(stats);
-            SolutionDemoEventManager.post(new NetworkQualityEvent(
-                    SolutionDataManager.ins().getUserId(), stats.txQuality));
-        }
-
-        @Override
-        public void onRemoteStreamStats(RemoteStreamStats stats) {
-            super.onRemoteStreamStats(stats);
-            SolutionDemoEventManager.post(new NetworkQualityEvent(stats.uid, stats.rxQuality));
-        }
-
-        /**
-         * RTM 登录结果回调
-         * @param uid 登录用户 ID
-         * @param error_code 登录结果
-         * @param elapsed 从调用 login 接口开始到返回结果所用时长（单位为 ms）。
-         */
-        @Override
-        public void onLoginResult(String uid, int error_code, int elapsed) {
-            Log.e(TAG, "onLoginResult error:" + error_code);
-            if (error_code == LoginErrorCode.LOGIN_ERROR_CODE_SUCCESS) {
-                LiveRTCManager manager = LiveRTCManager.ins();
-                RTCEngine engine = manager.mEngine;
-                if (engine != null) {
-                    engine.setServerParams(manager.mRTMInfo.serverSignature, manager.mRTMInfo.serverUrl);
-                }
-            } else {
-                SafeToast.show("连接失败");
-            }
-        }
-
-        @Override
-        public void onServerParamsSetResult(int error) {
-            Log.e(TAG, "onServerParamsSetResult error:" + error);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onServerParamsSetResult(error);
-            }
-        }
-
-        @Override
-        public void onServerMessageSendResult(long msgId, int error, ByteBuffer message) {
-            super.onServerMessageSendResult(msgId, error, message);
-            Log.e(TAG, "onServerMessageSendResult error:" + error);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onServerMessageSendResult(msgId, error);
-            }
-        }
-
-        @Override
-        public void onRoomMessageReceived(String uid, String message) {
-            Log.e(TAG, "onRoomMessageReceived message:" + message);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onMessageReceived(uid, message);
-            }
-        }
-
-        @Override
-        public void onUserMessageReceivedOutsideRoom(String uid, String message) {
-            Log.e(TAG, "onUserMessageReceivedOutsideRoom message:" + message);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onMessageReceived(uid, message);
-            }
-        }
-
-        @Override
-        public void onUserMessageReceived(String uid, String message) {
-            Log.e(TAG, "onUserMessageReceived message:" + message);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onMessageReceived(uid, message);
-            }
-        }
 
         /**
          * @param type 网络类型
@@ -228,20 +130,66 @@ public class LiveRTCManager {
             super.onNetworkTypeChanged(type);
             SolutionDemoEventManager.post(new NetworkConnectEvent(type != 0));
         }
+    };
+
+    /**
+     * RTC 业务加房事件回调
+     */
+    private final RTCRoomEventHandlerWithRTS mRTCRoomEventHandler = new RTCRoomEventHandlerWithRTS() {
 
         @Override
-        public void onUserPublishStream(String uid, RTCEngine.MediaStreamType type) {
+        public void onRoomStateChanged(String roomId, String uid, int state, String extraInfo) {
+            super.onRoomStateChanged(roomId, uid, state, extraInfo);
+            Log.d(TAG, String.format("onRoomStateChanged: %s, %s, %d, %s", roomId, uid, state, extraInfo));
+
+            mRoomId = roomId;
+            if (isFirstJoinRoomSuccess(state, extraInfo)) {
+                if (mSingleLiveInfo != null) {
+                    startLiveTranscoding(roomId, uid, mSingleLiveInfo.pushUrl);
+                }
+            }
+        }
+
+        @Override
+        public void onUserJoined(UserInfo userInfo, int elapsed) {
+            super.onUserJoined(userInfo, elapsed);
+            String uid = userInfo.getUid();
+            Log.d(TAG, String.format("onUserJoined : uid: %s ", uid));
+            if (!TextUtils.isEmpty(uid) && !TextUtils.isEmpty(mRoomId)) {
+                TextureView renderView = getUserRenderView(uid);
+                setRemoteVideoView(uid, mRoomId, renderView);
+            }
+        }
+
+        @Override
+        public void onNetworkQuality(NetworkQualityStats localQuality, NetworkQualityStats[] remoteQualities) {
+            super.onNetworkQuality(localQuality, remoteQualities);
+            // 发送本地网络状态统计
+            SolutionDemoEventManager.post(new NetworkQualityEvent(
+                    SolutionDataManager.ins().getUserId(), localQuality.txQuality));
+            // 发送远端网络状态统计
+            if (remoteQualities == null) {
+                return;
+            }
+            for (NetworkQualityStats stats : remoteQualities) {
+                SolutionDemoEventManager.post(new NetworkQualityEvent(stats.uid, stats.rxQuality));
+            }
+        }
+
+        @Override
+        public void onUserPublishStream(String uid, MediaStreamType type) {
             super.onUserPublishStream(uid, type);
 
             // 主播连麦
             if (mCoHostInfo != null && TextUtils.equals(uid, mCoHostInfo.coHostUserId)) {
-                LiveRTCManager.ins().updateLiveTranscodingWithHost(true,
+                adjustResolutionWhenPK(true, mCoHostVideoWidth, mCoHostVideoHeight);
+                updateLiveTranscodingWithHost(true,
                         mCoHostInfo.pushUrl, mCoHostInfo.selfRoomId, mCoHostInfo.selfUserId,
                         mCoHostInfo.coHostRoomId, mCoHostInfo.coHostUserId);
 
                 TextureView view = LiveRTCManager.ins().getUserRenderView(uid);
                 if (view != null) {
-                    LiveRTCManager.ins().setRemoteVideoView(uid, view);
+                    setRemoteVideoView(uid, mCoHostInfo.selfRoomId, view);
                 }
             } else {
                 updateLiveTranscodingWithAudience(mSingleLiveInfo.selfRoomId, mSingleLiveInfo.selfUserId,
@@ -257,11 +205,16 @@ public class LiveRTCManager {
         @Override
         public void onForwardStreamEvent(ForwardStreamEventInfo[] eventInfos) {
             super.onForwardStreamEvent(eventInfos);
+            if (eventInfos != null && eventInfos.length > 0) {
+                for (ForwardStreamEventInfo info : eventInfos) {
+                    Log.d(TAG, String.format("onForwardStreamEvent: %s", info));
+                }
+            }
         }
     };
 
-    private LiveTranscodingInfo mCoHostInfo;
-    private LiveTranscodingInfo mSingleLiveInfo;
+    private LiveTranscodingInfo mCoHostInfo; // 保存连麦用户的信息
+    private LiveTranscodingInfo mSingleLiveInfo; // 保存单主播用户的信息
     private List<String> mAudienceUserIdList;
 
     private static class LiveTranscodingInfo {
@@ -283,6 +236,22 @@ public class LiveRTCManager {
         }
     }
 
+    private static class LiveSettingConfig {
+        public int width;
+        public int height;
+        public int frameRate;
+        public int bitRate;
+
+        public LiveSettingConfig(){}
+
+        public LiveSettingConfig(int width, int height, int frameRate, int bitRate) {
+            this.width = width;
+            this.height = height;
+            this.frameRate = frameRate;
+            this.bitRate = bitRate;
+        }
+    }
+
     public static LiveRTCManager ins() {
         if (sInstance == null) {
             sInstance = new LiveRTCManager();
@@ -290,120 +259,66 @@ public class LiveRTCManager {
         return sInstance;
     }
 
-    public void rtcConnect(RtmInfo rtmInfo) {
-        mRTMInfo = rtmInfo;
-        initEngine(rtmInfo.appId, rtmInfo.bid);
-        mRTMClient = new LiveRtmClient(mEngine, rtmInfo);
-        mIRTCEngineEventHandler.setBaseClient(mRTMClient);
+    public void rtcConnect(RTSInfo rtsInfo) {
+        initEngine(rtsInfo.appId, rtsInfo.bid);
+        mRTSClient = new LiveRTSClient(mRTCVideo, rtsInfo);
+        mRTCVideoEventHandler.setBaseClient(mRTSClient);
+        mRTCRoomEventHandler.setBaseClient(mRTSClient);
+        mRTSRoomEventHandler.setBaseClient(mRTSClient);
+        mRTSClient.login(rtsInfo.rtmToken, (resultCode, message) ->
+                Log.d(TAG, String.format("notifyLoginResult: %d  %s", resultCode, message)));
     }
 
     public void initEngine(String appId, String bid) {
         Log.d(TAG, String.format("createEngine: appId: %s", appId));
         destroyEngine();
-        mEngine = RTCEngine.create(Utilities.getApplicationContext(), appId, mIRTCEngineEventHandler);
-        mEngine.setBusinessId(bid);
-        mEngine.setLocalVideoMirrorType(MirrorType.MIRROR_TYPE_RENDER_AND_ENCODER);
+        mRTCVideo = RTCVideo.createRTCVideo(Utilities.getApplicationContext(), appId, mRTCVideoEventHandler, null, null);
+        mRTCVideo.setBusinessId(bid);
+        mRTCVideo.setLocalVideoMirrorType(MirrorType.MIRROR_TYPE_RENDER_AND_ENCODER);
 
-        VideoCaptureConfig captureConfig = new VideoCaptureConfig(mFrameWidth, mFrameHeight, 15);
-        mEngine.setVideoCaptureConfig(captureConfig);
+        VideoCaptureConfig captureConfig = new VideoCaptureConfig(
+                mHostConfig.width, mHostConfig.height, mHostConfig.frameRate);
+        mRTCVideo.setVideoCaptureConfig(captureConfig);
 
-        VideoStreamDescription description = new VideoStreamDescription();
-        description.videoSize = new Pair<>(mFrameWidth, mFrameHeight);
-        description.frameRate = mFrameRate;
-        description.maxKbps = mBitrate;
-        mEngine.setVideoEncoderConfig(Collections.singletonList(description));
+        VideoEncoderConfig config = new VideoEncoderConfig();
+        config.width = mHostConfig.width;
+        config.height = mHostConfig.height;
+        config.frameRate = mHostConfig.frameRate;
+        config.maxBitrate = mHostConfig.bitRate;
+        mRTCVideo.setVideoEncoderConfig(config);
+        Log.d(TAG, "setVideoEncoderConfig: " + config);
 
-        AppExecutors.diskIO().execute(() -> LiveRTCManager.ins().initEffect());
+        initVideoEffect();
     }
 
     public void destroyEngine() {
         Log.d(TAG, "destroyEngine");
-        RTCEngine.destroyEngine(mEngine);
+        if (mRTCRoom != null) {
+            mRTCRoom.destroy();
+        }
+        if (mRTSClient != null) {
+            mRTSClient.logout();
+            mRTSClient = null;
+        }
+        if (mRTCVideo != null) {
+            RTCVideo.destroyRTCVideo();
+            mRTCVideo = null;
+        }
+
         mIsFront = true;
         mIsMicOn = true;
         mIsCameraOn = true;
         mIsTranscoding = false;
     }
 
-    public LiveRtmClient getRTMClient() {
-        return mRTMClient;
+    public LiveRTSClient getRTSClient() {
+        return mRTSClient;
     }
 
-    public void clearRTMEventListener() {
-        if (mRTMClient != null) {
-            mRTMClient.removeEventListener();
+    public void clearRTSEventListener() {
+        if (mRTSClient != null) {
+            mRTSClient.removeEventListener();
         }
-    }
-
-    public void initEffect() {
-        if (mEngine != null) {
-            initEffectPath();
-            int licRes = mEngine.checkVideoEffectLicense(Utilities.getApplicationContext(), getLicensePath());
-            mEngine.setVideoEffectAlgoModelPath(getEffectAlgoModelPath());
-            int enableRes = mEngine.enableVideoEffect(true);
-
-            mEffectPathList.add(getByteComposePath());
-            mEffectPathList.add(getByteShapePath());
-            LiveRTCManager.ins().setVideoEffectNodes(mEffectPathList);
-            setStickerNodes(mLastStickerPath);
-
-            updateVideoEffectNode();
-
-            setVideoEffectColorFilter(mLastFilter);
-            updateColorFilterIntensity(mLastFilterValue);
-        }
-    }
-
-    private String mLastFilter = "";
-    private float mLastFilterValue = 0;
-    private Map<String, Map<String, Float>> mEffectValue = new HashMap<>();
-
-    public String getByteStickerPath() {
-        File stickerPath = new File(Utilities.getApplicationContext().getExternalFilesDir("assets").getAbsolutePath() + "/resource/", "cvlab/StickerResource.bundle");
-        return stickerPath.getAbsolutePath() + "/";
-    }
-
-    public String getByteComposePath() {
-        File composerPath = new File(Utilities.getApplicationContext().getExternalFilesDir("assets").getAbsolutePath() + "/resource/", "cvlab/ComposeMakeup.bundle");
-        return composerPath.getAbsolutePath() + "/ComposeMakeup/beauty_Android_live";
-    }
-
-    public String getByteShapePath() {
-        File composerPath = new File(Utilities.getApplicationContext().getExternalFilesDir("assets").getAbsolutePath() + "/resource/", "cvlab/ComposeMakeup.bundle");
-        return composerPath.getAbsolutePath() + "/ComposeMakeup/reshape_live";
-    }
-
-    public String getByteColorFilterPath() {
-        File filterPath = new File(Utilities.getApplicationContext().getExternalFilesDir("assets").getAbsolutePath() + "/resource/", "cvlab/FilterResource.bundle");
-        return filterPath.getAbsolutePath() + "/Filter/";
-    }
-
-    public void initEffectPath() {
-        File licensePath = new File(getExternalResourcePath(), "cvlab/LicenseBag.bundle");
-        if (!licensePath.exists()) {
-            copyAssetFolder(Utilities.getApplicationContext(), "cvlab/LicenseBag.bundle", licensePath.getAbsolutePath());
-        }
-        File modelPath = new File(getExternalResourcePath(), "cvlab/ModelResource.bundle");
-        if (!modelPath.exists()) {
-            copyAssetFolder(Utilities.getApplicationContext(), "cvlab/ModelResource.bundle", modelPath.getAbsolutePath());
-        }
-        File stickerPath = new File(getExternalResourcePath(), "cvlab/StickerResource.bundle");
-        if (!stickerPath.exists()) {
-            copyAssetFolder(Utilities.getApplicationContext(), "cvlab/StickerResource.bundle", stickerPath.getAbsolutePath());
-        }
-        File filterPath = new File(getExternalResourcePath(), "cvlab/FilterResource.bundle");
-        if (!filterPath.exists()) {
-            copyAssetFolder(Utilities.getApplicationContext(), "cvlab/FilterResource.bundle", filterPath.getAbsolutePath());
-        }
-        File composerPath = new File(getExternalResourcePath(), "cvlab/ComposeMakeup.bundle");
-        if (!composerPath.exists()) {
-            copyAssetFolder(Utilities.getApplicationContext(), "cvlab/ComposeMakeup.bundle", composerPath.getAbsolutePath());
-        }
-    }
-
-
-    private String getExternalResourcePath() {
-        return Utilities.getApplicationContext().getExternalFilesDir("assets").getAbsolutePath() + "/resource/";
     }
 
     public boolean isCameraOn() {
@@ -414,100 +329,26 @@ public class LiveRTCManager {
         return mIsMicOn;
     }
 
-    public void setVideoEffectNodes(List<String> pathList) {
-        if (mEngine != null) {
-            mEngine.setVideoEffectNodes(pathList);
-        }
-    }
-
-    private String mLastStickerPath = "";
-
-    public void setStickerNodes(String path) {
-        if (mEngine != null) {
-            ArrayList<String> pathList = new ArrayList<>(mEffectPathList);
-            if (!TextUtils.isEmpty(path)) {
-                pathList.add(getByteStickerPath() + path);
-            }
-            mEngine.setVideoEffectNodes(pathList);
-        }
-        mLastStickerPath = path;
-    }
-
-    public String getStickerPath() {
-        return mLastStickerPath;
-    }
-
-    public void updateVideoEffectNode() {
-        if (mEngine != null) {
-            for (Map.Entry<String, Map<String, Float>> entry : mEffectValue.entrySet()) {
-                String path = entry.getKey();
-                Map<String, Float> keyValue = entry.getValue();
-                for (Map.Entry<String, Float> temp : keyValue.entrySet()) {
-                    updateVideoEffectNode(path, temp.getKey(), temp.getValue());
-                }
-            }
-        }
-    }
-
-    public void updateVideoEffectNode(String path, String key, float val) {
-        if (mEngine != null) {
-            mEngine.updateVideoEffectNode(path, key, val);
-        }
-        Map<String, Float> keyValue = mEffectValue.get(path);
-        if (keyValue == null) {
-            keyValue = new HashMap<>();
-            mEffectValue.put(path, keyValue);
-        }
-        keyValue.put(key, val);
-    }
-
-    public void setVideoEffectColorFilter(String path) {
-        if (mEngine != null) {
-            mEngine.setVideoEffectColorFilter(path);
-        }
-        mLastFilter = path;
-    }
-
-    public String getLastFilterPath() {
-        return mLastFilter;
-    }
-
-    public float getLastFilterValue() {
-        return mLastFilterValue;
-    }
-
-    public void updateColorFilterIntensity(float intensity) {
-        if (mEngine != null) {
-            mEngine.setVideoEffectColorFilterIntensity(intensity);
-        }
-        mLastFilterValue = intensity;
-    }
-
-    private String getLicensePath() {
-        return new File(getExternalResourcePath(), "cvlab/LicenseBag.bundle").getAbsolutePath() +
-                "/rtc_test_20210911_20220831_rtc.vertcdemo.android_4.1.0.1.licbag";
-    }
-
-    private String getEffectAlgoModelPath() {
-        return new File(getExternalResourcePath(), "cvlab/ModelResource.bundle").getAbsolutePath();
-    }
-
     public void joinRoom(String roomId, String userId, String token) {
         Log.d(TAG, String.format("joinRoom: %s %s %s", roomId, userId, token));
-        if (mEngine != null) {
-            RTCRoomConfig config = new RTCRoomConfig(
-                    RTCEngine.ChannelProfile.CHANNEL_PROFILE_COMMUNICATION,
-                    true, true, true);
-            mEngine.joinRoom(token, roomId, new UserInfo(userId, null), config);
+        if (mRTCVideo == null) {
+            return;
         }
+        mRTCRoom = mRTCVideo.createRTCRoom(roomId);
+        mRTCRoom.setRTCRoomEventHandler(mRTCRoomEventHandler);
+        mRTCRoomEventHandler.setBaseClient(mRTSClient);
+        UserInfo userInfo = new UserInfo(userId, null);
+        RTCRoomConfig roomConfig = new RTCRoomConfig(ChannelProfile.CHANNEL_PROFILE_COMMUNICATION,
+                true, true, true);
+        mRTCRoom.joinRoom(token, userInfo, roomConfig);
     }
 
     public void startCaptureVideo(boolean isStart) {
-        if (mEngine != null) {
+        if (mRTCVideo != null) {
             if (isStart) {
-                mEngine.startVideoCapture();
+                mRTCVideo.startVideoCapture();
             } else {
-                mEngine.stopVideoCapture();
+                mRTCVideo.stopVideoCapture();
             }
         }
         mIsCameraOn = isStart;
@@ -515,11 +356,11 @@ public class LiveRTCManager {
     }
 
     public void startCaptureAudio(boolean isStart) {
-        if (mEngine != null) {
+        if (mRTCVideo != null) {
             if (isStart) {
-                mEngine.startAudioCapture();
+                mRTCVideo.startAudioCapture();
             } else {
-                mEngine.stopAudioCapture();
+                mRTCVideo.stopAudioCapture();
             }
         }
         mIsMicOn = isStart;
@@ -531,21 +372,24 @@ public class LiveRTCManager {
      */
     public void leaveRoom() {
         Log.d(TAG, "leaveRoom");
-        if (mEngine != null) {
-            mEngine.leaveRoom();
-            mEngine.stopVideoCapture();
-            mEngine.stopAudioCapture();
+        stopLiveTranscoding();
+        if (mRTCRoom != null) {
+            mRTCRoom.leaveRoom();
+            mRTCRoom.destroy();
         }
+        mSingleLiveInfo = null;
+        mCoHostInfo = null;
         mIsFront = true;
         mIsMicOn = true;
         mIsCameraOn = true;
         mIsTranscoding = false;
+        mRoomId = null;
     }
 
     public void switchCamera(boolean isFront) {
-        if (mEngine != null) {
-            mEngine.switchCamera(isFront ? CameraId.CAMERA_ID_FRONT : CameraId.CAMERA_ID_BACK);
-            mEngine.setLocalVideoMirrorType(isFront ? MirrorType.MIRROR_TYPE_RENDER_AND_ENCODER : MirrorType.MIRROR_TYPE_NONE);
+        if (mRTCVideo != null) {
+            mRTCVideo.switchCamera(isFront ? CameraId.CAMERA_ID_FRONT : CameraId.CAMERA_ID_BACK);
+            mRTCVideo.setLocalVideoMirrorType(isFront ? MirrorType.MIRROR_TYPE_RENDER_AND_ENCODER : MirrorType.MIRROR_TYPE_NONE);
         }
         mIsFront = isFront;
     }
@@ -555,11 +399,11 @@ public class LiveRTCManager {
     }
 
     public void turnOnMic(boolean isMicOn) {
-        if (mEngine != null) {
+        if (mRTCVideo != null) {
             if (isMicOn) {
-                mEngine.startAudioCapture();
+                mRTCVideo.startAudioCapture();
             } else {
-                mEngine.stopAudioCapture();
+                mRTCVideo.stopAudioCapture();
             }
         }
         Log.d(TAG, "turnOnMic : " + isMicOn);
@@ -571,12 +415,30 @@ public class LiveRTCManager {
         turnOnMic(!mIsMicOn);
     }
 
+    public void publishAudio() {
+        if (mRTCRoom == null) {
+            return;
+        }
+        mRTCRoom.publishStream(MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO);
+        mIsMicOn = true;
+        postMediaStatus();
+    }
+
+    public void unPublishAudio() {
+        if (mRTCRoom == null) {
+            return;
+        }
+        mRTCRoom.unpublishStream(MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO);
+        mIsMicOn = false;
+        postMediaStatus();
+    }
+
     public void turnOnCamera(boolean isCameraOn) {
-        if (mEngine != null) {
+        if (mRTCVideo != null) {
             if (isCameraOn) {
-                mEngine.startVideoCapture();
+                mRTCVideo.startVideoCapture();
             } else {
-                mEngine.stopVideoCapture();
+                mRTCVideo.stopVideoCapture();
             }
         }
         mIsCameraOn = isCameraOn;
@@ -599,12 +461,12 @@ public class LiveRTCManager {
     }
 
     public void setLocalVideoView(@NonNull TextureView surfaceView) {
-        if (mEngine == null) {
+        if (mRTCVideo == null) {
             return;
         }
         VideoCanvas videoCanvas = new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, "", false);
-        mEngine.setLocalVideoCanvas(StreamIndex.STREAM_INDEX_MAIN, null);
-        mEngine.setLocalVideoCanvas(StreamIndex.STREAM_INDEX_MAIN, videoCanvas);
+        mRTCVideo.setLocalVideoCanvas(StreamIndex.STREAM_INDEX_MAIN, null);
+        mRTCVideo.setLocalVideoCanvas(StreamIndex.STREAM_INDEX_MAIN, videoCanvas);
         Log.d(TAG, "setLocalVideoView");
     }
 
@@ -620,22 +482,33 @@ public class LiveRTCManager {
         return view;
     }
 
-    public void setRemoteVideoView(String userId, TextureView textureView) {
-        if (mEngine != null) {
-            VideoCanvas canvas = new VideoCanvas(textureView, RENDER_MODE_HIDDEN, userId, false);
-            mEngine.setRemoteVideoCanvas(userId, StreamIndex.STREAM_INDEX_MAIN, null);
-            mEngine.setRemoteVideoCanvas(userId, StreamIndex.STREAM_INDEX_MAIN, canvas);
-            Log.d(TAG, "setRemoteVideoView : " + userId);
+    public void removeAllUserRenderView() {
+        mUidViewMap.clear();
+    }
+
+    public void setRemoteVideoView(String userId, String roomId, TextureView textureView) {
+        Log.d(TAG, String.format("setRemoteVideoView : %s %s", userId, roomId));
+        if (mRTCVideo != null) {
+            VideoCanvas canvas = new VideoCanvas(textureView, RENDER_MODE_HIDDEN, roomId, userId, false);
+            mRTCVideo.setRemoteVideoCanvas(userId, StreamIndex.STREAM_INDEX_MAIN, canvas);
         }
     }
 
+    /**
+     * mute 远端音频
+     * @param uid 用户id
+     * @param mute 是否静音
+     */
     public void muteRemoteAudio(String uid, boolean mute) {
-        if (mEngine != null) {
-            RTCEngine.SubscribeMediaType type = mute ? RTC_SUBSCRIBE_MEDIA_TYPE_VIDEO_ONLY
-                    : RTC_SUBSCRIBE_MEDIA_TYPE_AUDIO_AND_VIDEO;
-            SubscribeVideoConfig config = new SubscribeVideoConfig(0, REMOTE_USER_PRIORITY_HIGH.value());
-            mEngine.subscribeUserStream(uid, StreamIndex.STREAM_INDEX_MAIN, type, config);
+        Log.d(TAG, "muteRemoteAudio uid:" + uid + ",mute:" + mute);
+        if (mRTCRoom != null) {
+            if (mute) {
+                mRTCRoom.unsubscribeStream(uid, MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO);
+            } else {
+                mRTCRoom.subscribeStream(uid, MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO);
+            }
         }
+        updateLiveTranscodingWhenMuteCoHost(uid, mute);
     }
 
     public void setLiveTranscodingType(boolean isClient) {
@@ -646,54 +519,73 @@ public class LiveRTCManager {
         return mIsClientTranscoding;
     }
 
-    public void setFrameRate(int frameRate) {
-        mFrameRate = frameRate;
-        updateVideoConfig();
+    public void setFrameRate(@LiveDataManager.LiveRoleType int role, int frameRate) {
+        LiveSettingConfig config = role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig
+                : mGuestConfig;
+        config.frameRate = frameRate;
+        updateVideoConfig(config.width, config.height, config.frameRate, config.bitRate);
     }
 
-    public void setResolution(int width, int height) {
-        mFrameWidth = width;
-        mFrameHeight = height;
-        updateVideoConfig();
+    public void setResolution(@LiveDataManager.LiveRoleType int role, int width, int height) {
+        LiveSettingConfig config = role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig
+                : mGuestConfig;
+        config.width = width;
+        config.height = height;
+        updateVideoConfig(config.width, config.height, config.frameRate, config.bitRate);
     }
 
-    public void setBitrate(int bitrate) {
-        mBitrate = bitrate;
-        updateVideoConfig();
+    public void setBitrate(@LiveDataManager.LiveRoleType int role, int bitRate) {
+        LiveSettingConfig config = role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig
+                : mGuestConfig;
+        config.bitRate = bitRate;
+        updateVideoConfig(config.width, config.height, config.frameRate, config.bitRate);
     }
 
-    public int getBitrate() {
-        return mBitrate;
+    public int getBitrate(@LiveDataManager.LiveRoleType int role) {
+        return role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig.bitRate
+                : mGuestConfig.bitRate;
     }
 
-    public int getFrameRate() {
-        return mFrameRate;
+    public int getFrameRate(@LiveDataManager.LiveRoleType int role) {
+        return role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig.frameRate
+                : mGuestConfig.frameRate;
     }
 
-    public int getWidth() {
-        return mFrameWidth;
+    public int getWidth(@LiveDataManager.LiveRoleType int role) {
+        return role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig.width
+                : mGuestConfig.width;
     }
 
-    public int getHeight() {
-        return mFrameHeight;
+    public int getHeight(@LiveDataManager.LiveRoleType int role) {
+        return role == LiveDataManager.USER_ROLE_HOST
+                ? mHostConfig.height
+                : mGuestConfig.height;
     }
 
     public boolean isLiveTranscoding() {
         return mIsTranscoding;
     }
 
-    private void updateVideoConfig() {
-        if (mEngine != null && !mIsTranscoding) {
-            VideoStreamDescription description = new VideoStreamDescription();
-            description.videoSize = new Pair<>(mFrameWidth, mFrameHeight);
-            description.frameRate = mFrameRate;
-            description.maxKbps = mBitrate;
+    private void updateVideoConfig(int width, int height, int frameRate, int bitRate) {
+        if (mRTCVideo != null && !mIsTranscoding) {
+            VideoEncoderConfig config = new VideoEncoderConfig();
+            config.width = width;
+            config.height = height;
+            config.frameRate = frameRate;
+            config.maxBitrate = bitRate;
             Log.d(TAG, String.format("updateVideoConfig: %d-%d %d %d",
-                    mFrameWidth, mFrameHeight, mFrameRate, mBitrate));
-            mEngine.setVideoEncoderConfig(Collections.singletonList(description));
+                    width, height, frameRate, bitRate));
+            mRTCVideo.setVideoEncoderConfig(config);
+            Log.d(TAG, "setVideoEncoderConfig: " + config);
 
-            VideoCaptureConfig captureConfig = new VideoCaptureConfig(mFrameWidth, mFrameHeight, mFrameRate);
-            mEngine.setVideoCaptureConfig(captureConfig);
+            VideoCaptureConfig captureConfig = new VideoCaptureConfig(width, height, frameRate);
+            mRTCVideo.setVideoCaptureConfig(captureConfig);
         }
     }
 
@@ -708,48 +600,26 @@ public class LiveRTCManager {
         return mPlayLiveResolution;
     }
 
-    private IRTCRoom mRTMRoom = null;
-    private final IRtcRoomEventHandlerAdapter mIRtcRoomEventHandlerAdapter = new IRtcRoomEventHandlerAdapter() {
-
-        @Override
-        public void onRoomMessageReceived(String uid, String message) {
-            super.onRoomMessageReceived(uid, message);
-            Log.e(TAG, "onRoomMessageReceived message:" + message);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onMessageReceived(uid, message);
-            }
-        }
-
-        @Override
-        public void onUserMessageReceived(String uid, String message) {
-            super.onUserMessageReceived(uid, message);
-            Log.e(TAG, "onUserMessageReceived message:" + message);
-            LiveRTCManager manager = LiveRTCManager.ins();
-            if (manager != null && manager.mRTMClient != null) {
-                manager.mRTMClient.onMessageReceived(uid, message);
-            }
-        }
-    };
-
-    public void joinRTMRoom(String rtmRoomId, String userId, String token) {
-        if (mEngine == null) {
+    public void joinRTSRoom(String rtsRoomId, String userId, String token) {
+        Log.d(TAG, String.format("joinRTSRoom: %s  %s  %s", rtsRoomId, userId, token));
+        if (mRTCVideo == null) {
             return;
         }
-        mRTMRoom = mEngine.createRoom(rtmRoomId);
-        mRTMRoom.setRTCRoomEventHandler(mIRtcRoomEventHandlerAdapter);
-        MultiRoomConfig multiRoomConfig = new MultiRoomConfig(
-                RTCEngine.ChannelProfile.CHANNEL_PROFILE_COMMUNICATION,
-                false, false);
-        mRTMRoom.joinRoom(token, new UserInfo(userId, null), multiRoomConfig);
+        mRTSRoom = mRTCVideo.createRTCRoom(rtsRoomId);
+        mRTSRoom.setRTCRoomEventHandler(mRTSRoomEventHandler);
+        UserInfo userInfo = new UserInfo(userId, null);
+        RTCRoomConfig roomConfig = new RTCRoomConfig(ChannelProfile.CHANNEL_PROFILE_COMMUNICATION,
+                false, false, false);
+        mRTSRoom.joinRoom(token, userInfo, roomConfig);
     }
 
-    public void leaveRTMRoom() {
-        if (mRTMRoom == null) {
+    public void leaveRTSRoom() {
+        if (mRTSRoom == null) {
             return;
         }
-        mRTMRoom.leaveRoom();
-        mRTMRoom.destroy();
+        mRTSRoom.leaveRoom();
+        mRTSRoom.destroy();
+        mRTSRoom = null;
     }
 
     private final ILiveTranscodingObserver mILiveTranscodingObserver = new ILiveTranscodingObserver() {
@@ -770,7 +640,8 @@ public class LiveRTCManager {
          * @param mixType 转推直播类型
          */
         @Override
-        public void onStreamMixingEvent(ByteRTCStreamMixingEvent eventType, String taskId, ByteRTCTranscoderErrorCode error, ByteRTCStreamMixingType mixType) {
+        public void onStreamMixingEvent(ByteRTCStreamMixingEvent eventType, String taskId,
+                                        ByteRTCTranscoderErrorCode error, ByteRTCStreamMixingType mixType) {
             Log.d(TAG, String.format("onStreamMixingEvent: %s %s", eventType, error));
         }
 
@@ -794,11 +665,20 @@ public class LiveRTCManager {
         mSingleLiveInfo = new LiveTranscodingInfo(pushUrl, roomId, userId, null, null);
     }
 
+    /**
+     * 开启合流转推
+     * @param roomId 房间id
+     * @param userId 用户id
+     * @param liveUrl rtmp 推流地址
+     */
     private void startLiveTranscoding(String roomId, String userId, String liveUrl) {
         Log.d(TAG, String.format("startLiveTranscoding: %s  %s  %s", roomId, userId, liveUrl));
+        mRoomId = roomId;
         LiveTranscoding liveTranscoding = LiveTranscoding.getDefualtLiveTranscode();
         // 设置房间id
         liveTranscoding.setRoomId(roomId);
+        // 设置用户id
+        liveTranscoding.setUserId(userId);
         // 设置推流的直播地址
         liveTranscoding.setUrl(liveUrl);
         // 设置合流模式，0 代表服务端合流
@@ -806,10 +686,10 @@ public class LiveRTCManager {
 
         // 设置合流视频参数，具体参数根据情况而定
         LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
-        videoConfig.setWidth(mFrameWidth);
-        videoConfig.setHeight(mFrameHeight);
-        videoConfig.setFps(mFrameRate);
-        videoConfig.setKBitRate(mBitrate);
+        videoConfig.setWidth(mHostConfig.width);
+        videoConfig.setHeight(mHostConfig.height);
+        videoConfig.setFps(mHostConfig.frameRate);
+        videoConfig.setKBitRate(mHostConfig.bitRate);
         liveTranscoding.setVideo(videoConfig);
 
         // 设置合流音频参数，具体参数根据情况而定
@@ -832,7 +712,41 @@ public class LiveRTCManager {
         liveTranscoding.setLayout(layoutBuilder.builder());
 
         // 开始服务端合流任务，taskid使用空字符串即可
-        mEngine.startLiveTranscoding("", liveTranscoding, mILiveTranscodingObserver);
+        mRTCVideo.startLiveTranscoding("", liveTranscoding, mILiveTranscodingObserver);
+    }
+
+    /**
+     * 停止合流转推
+     */
+    public void stopLiveTranscoding() {
+        Log.d(TAG, "stopLiveTranscoding");
+        if (mRTCVideo != null) {
+            mRTCVideo.stopLiveTranscoding("");
+        }
+        mLiveTranscoding = null;
+    }
+
+    /**
+     * PK时调整编码分辨率，调整为单独直播时一半
+     * @param adjust true表示调整，false表示恢复
+     */
+    private void adjustResolutionWhenPK(boolean adjust, int coHostWidth, int coHostHeight) {
+        if (mRTCVideo == null) {
+            return;
+        }
+        VideoEncoderConfig config = new VideoEncoderConfig();
+        config.frameRate = mHostConfig.frameRate;
+        if (adjust) {
+            config.width = (Math.max(mHostConfig.width, coHostWidth)) / 2;
+            config.height = (Math.max(mHostConfig.height, coHostHeight)) / 2;
+            config.maxBitrate = mHostConfig.bitRate / 4;
+        } else {
+            config.width = mHostConfig.width;
+            config.height = mHostConfig.height;
+            config.maxBitrate = mHostConfig.bitRate;
+        }
+        Log.d(TAG, "setVideoEncoderConfig: " + config);
+        mRTCVideo.setVideoEncoderConfig(config);
     }
 
     /**
@@ -846,6 +760,8 @@ public class LiveRTCManager {
                                                String selfUserId, String coHostRoomId, String coHostUserId) {
 
         mIsTranscoding = isStart;
+        mIsPk = isStart;
+        adjustResolutionWhenPK(isStart, mCoHostVideoWidth, mCoHostVideoHeight);
 
         LiveTranscoding liveTranscoding = LiveTranscoding.getDefualtLiveTranscode();
         // 设置房间id
@@ -857,10 +773,10 @@ public class LiveRTCManager {
 
         // 设置合流视频参数，具体参数根据情况而定
         LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
-        videoConfig.setWidth(mFrameWidth);
-        videoConfig.setHeight(mFrameHeight);
-        videoConfig.setFps(mFrameRate);
-        videoConfig.setKBitRate(mBitrate);
+        videoConfig.setWidth(mHostConfig.width);
+        videoConfig.setHeight(mHostConfig.height);
+        videoConfig.setFps(mHostConfig.frameRate);
+        videoConfig.setKBitRate(mHostConfig.bitRate);
         liveTranscoding.setVideo(videoConfig);
 
         // 设置合流音频参数，具体参数根据情况而定
@@ -873,6 +789,7 @@ public class LiveRTCManager {
         if (isStart) {
             LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
             selfRegion.uid(selfUserId);
+            selfRegion.setLocalUser(true);
             selfRegion.roomId(selfRoomId);
             selfRegion.position(0, 0.25); // 设置用户视频布局的相对位置，取值范围[0, 1]，(0,0)为左上角，根据实际情况调整
             selfRegion.size(0.5, 0.5); // 设置用户视频相对大小，取值范围[0, 1]，根据实际情况调整
@@ -882,6 +799,7 @@ public class LiveRTCManager {
 
             LiveTranscoding.Region hostRegion = new LiveTranscoding.Region();
             hostRegion.uid(coHostUserId);
+            hostRegion.setLocalUser(false);
             hostRegion.roomId(selfRoomId);
             hostRegion.position(0.5, 0.25);
             hostRegion.size(0.5, 0.5);
@@ -892,6 +810,7 @@ public class LiveRTCManager {
         } else {
             LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
             selfRegion.uid(selfUserId);
+            selfRegion.setLocalUser(true);
             selfRegion.roomId(selfRoomId);
             selfRegion.position(0, 0);
             selfRegion.size(1, 1);
@@ -900,8 +819,47 @@ public class LiveRTCManager {
             layoutBuilder.addRegion(selfRegion);
         }
         liveTranscoding.setLayout(layoutBuilder.builder());
+        mLiveTranscoding = liveTranscoding;
 
-        mEngine.updateLiveTranscoding("", liveTranscoding);
+        mRTCVideo.updateLiveTranscoding("", liveTranscoding);
+    }
+
+
+    /**
+     * 当 mute 对方主播时，需要修改合流转推参数
+     * @param userId 用户userId
+     * @param isMute 是否是静音
+     */
+    public void updateLiveTranscodingWhenMuteCoHost(String userId, boolean isMute) {
+        if (TextUtils.isEmpty(userId)) {
+            Log.d(TAG, "muteCoHost() failed, userId is empty");
+            return;
+        }
+        if (mLiveTranscoding == null || !mIsPk || mCoHostInfo == null) {
+            Log.d(TAG, "muteCoHost() failed, LiveTranscoding params error");
+            return;
+        }
+        LiveTranscoding.Layout layout = mLiveTranscoding.getLayout();
+        if (layout == null) {
+            Log.d(TAG, "muteCoHost() failed, layout is null");
+            return;
+        }
+        LiveTranscoding.Region[] regions = layout.getRegions();
+        if (regions == null) {
+            Log.d(TAG, "muteCoHost() failed, regions is null");
+            return;
+        }
+        for (LiveTranscoding.Region region : regions) {
+            if (region != null && !region.isLocalUser() && TextUtils.equals(userId, mCoHostInfo.coHostUserId)) {
+                region.contentControl(isMute
+                        ? LiveTranscoding.TranscoderContentControlType.HAS_VIDEO_ONLY
+                        : LiveTranscoding.TranscoderContentControlType.HAS_AUDIO_AND_VIDEO);
+                break;
+            }
+        }
+        if (mRTCVideo != null) {
+            mRTCVideo.updateLiveTranscoding("", mLiveTranscoding);
+        }
     }
 
     /**
@@ -922,10 +880,10 @@ public class LiveRTCManager {
         liveTranscoding.setMixType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
 
         LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
-        videoConfig.setWidth(mFrameWidth);
-        videoConfig.setHeight(mFrameHeight);
-        videoConfig.setFps(mFrameRate);
-        videoConfig.setKBitRate(mBitrate);
+        videoConfig.setWidth(mHostConfig.width);
+        videoConfig.setHeight(mHostConfig.height);
+        videoConfig.setFps(mHostConfig.frameRate);
+        videoConfig.setKBitRate(mHostConfig.bitRate);
         liveTranscoding.setVideo(videoConfig);
 
         LiveTranscoding.AudioConfig audioConfig = liveTranscoding.getAudio();
@@ -972,7 +930,7 @@ public class LiveRTCManager {
         }
         liveTranscoding.setLayout(layoutBuilder.builder());
 
-        mEngine.updateLiveTranscoding("", liveTranscoding);
+        mRTCVideo.updateLiveTranscoding("", liveTranscoding);
     }
 
     /**
@@ -989,15 +947,49 @@ public class LiveRTCManager {
         mCoHostInfo = new LiveTranscodingInfo(pushUrl, selfRoomId, selfUserId, coHostRoomId, coHostUserId);
 
         ForwardStreamInfo forwardStreamInfo = new ForwardStreamInfo(coHostRoomId, token);
-        int res = mEngine.startForwardStreamToRooms(Collections.singletonList(forwardStreamInfo));
-        Log.d(TAG, "startForwardStreamToRooms: " + res);
+        if (mRTCRoom != null) {
+            mRTCRoom.stopForwardStreamToRooms();
+            int res = mRTCRoom.startForwardStreamToRooms(Collections.singletonList(forwardStreamInfo));
+            Log.d(TAG, "startForwardStreamToRooms: " + res);
+        }
+    }
+
+    private int mCoHostVideoWidth; // 对方主播视频的宽
+    private int mCoHostVideoHeight; // 对方主播视频的高
+
+    /**
+     * 设置对方主播视频分辨率
+     * @param coHostVideoWidth  对方主播视频的宽
+     * @param coHostVideoHeight  对方主播视频的高
+     */
+    public void setCoHostVideoConfig(int coHostVideoWidth, int coHostVideoHeight) {
+        mCoHostVideoWidth = coHostVideoWidth;
+        mCoHostVideoHeight = coHostVideoHeight;
     }
 
     /**
      * 停止自己的视频流推送到其他房间
      */
     public void stopLiveTranscodingWithHost() {
+        Log.d(TAG, "stopLiveTranscodingWithHost");
         mCoHostInfo = null;
-        mEngine.stopForwardStreamToRooms();
+        if (mRTCRoom != null) {
+            mRTCRoom.stopForwardStreamToRooms();
+        }
+    }
+
+    /**
+     * 初始化美颜
+     */
+    private void initVideoEffect() {
+
+    }
+
+    /**
+     * 打开美颜对话框
+     * @param context 上下文对象
+     */
+    public void openEffectDialog(Context context) {
+        SafeToast.show("开源代码暂不支持美颜相关功能，体验效果请下载Demo");
     }
 }

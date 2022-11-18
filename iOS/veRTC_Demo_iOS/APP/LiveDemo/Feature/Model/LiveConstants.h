@@ -2,8 +2,8 @@
 //  LiveConstants.h
 //  veRTC_Demo
 //
-//  Created by bytedance on 2022/4/19.
-//  Copyright © 2022 bytedance. All rights reserved.
+//  Created by on 2022/4/19.
+//  
 //
 
 #ifndef LiveConstants_h

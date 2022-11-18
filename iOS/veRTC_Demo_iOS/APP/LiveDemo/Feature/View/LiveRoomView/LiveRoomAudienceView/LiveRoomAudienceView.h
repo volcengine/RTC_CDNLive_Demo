@@ -2,8 +2,8 @@
 //  LiveRoomAudienceView.h
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import <UIKit/UIKit.h>
@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface LiveRoomAudienceView : UIView
 
-@property (nonatomic, strong) NSArray *dataLists;
+@property (nonatomic, copy) NSArray *dataLists;
 
 @end
 

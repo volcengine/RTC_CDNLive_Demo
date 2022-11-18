@@ -44,7 +44,7 @@ public class GiftDialog extends BaseDialog {
 
     private void sendGift(String giftType) {
         String userName = SolutionDataManager.ins().getUserName();
-        LiveRTCManager.ins().getRTMClient().sendMessage(mRoomId, userName, giftType, mCallback);
+        LiveRTCManager.ins().getRTSClient().sendMessage(mRoomId, userName, giftType, mCallback);
         dismiss();
     }
 }

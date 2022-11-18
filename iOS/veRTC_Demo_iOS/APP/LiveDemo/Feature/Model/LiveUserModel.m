@@ -2,8 +2,8 @@
 //  LiveUserModel.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/10/19.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/10/19.
+//  
 //
 
 #import "LiveUserModel.h"
@@ -20,7 +20,7 @@
 }
 
 - (BOOL)isLoginUser {
-    if ([self.uid isEqualToString:[LocalUserComponents userModel].uid]) {
+    if ([self.uid isEqualToString:[LocalUserComponent userModel].uid]) {
         return YES;
     } else {
         return NO;

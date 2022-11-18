@@ -1,11 +1,11 @@
 package com.volcengine.vertcdemo.interactivelive.bean;
 
 import com.google.gson.annotations.SerializedName;
-import com.volcengine.vertcdemo.core.net.rtm.RTMBizResponse;
+import com.volcengine.vertcdemo.core.net.rts.RTSBizResponse;
 
 import java.util.List;
 
-public class LiveAnchorPermitAudienceResponse implements RTMBizResponse {
+public class LiveAnchorPermitAudienceResponse implements RTSBizResponse {
 
     @SerializedName("rtc_room_id")
     public String rtcRoomId;

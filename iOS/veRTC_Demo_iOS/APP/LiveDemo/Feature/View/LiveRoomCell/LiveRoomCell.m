@@ -2,17 +2,17 @@
 //  LiveRoomCell.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import "LiveRoomCell.h"
-#import "LiveAvatarCompoments.h"
+#import "LiveAvatarComponent.h"
 
 @interface LiveRoomCell ()
 
 @property (nonatomic, strong) UIView *bgView;
-@property (nonatomic, strong) LiveAvatarCompoments *avatarView;
+@property (nonatomic, strong) LiveAvatarComponent *avatarView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *roomIDLabel;
 @property (nonatomic, strong) UIImageView *livingImageView;
@@ -26,7 +26,7 @@
     if (self) {
         self.backgroundColor = [UIColor clearColor];
         self.contentView.backgroundColor = [UIColor clearColor];
-        [self createUIComponents];
+        [self createUIComponent];
     }
     return self;
 }
@@ -40,7 +40,7 @@
 
 #pragma mark - Private Action
 
-- (void)createUIComponents {
+- (void)createUIComponent {
     [self.contentView addSubview:self.bgView];
     [self.bgView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.top.equalTo(self.contentView).offset(20);
@@ -81,9 +81,9 @@
 
 #pragma mark - getter
 
-- (LiveAvatarCompoments *)avatarView {
+- (LiveAvatarComponent *)avatarView {
     if (!_avatarView) {
-        _avatarView = [[LiveAvatarCompoments alloc] init];
+        _avatarView = [[LiveAvatarComponent alloc] init];
         _avatarView.layer.cornerRadius = 20;
         _avatarView.layer.masksToBounds = YES;
         _avatarView.fontSize = 20;

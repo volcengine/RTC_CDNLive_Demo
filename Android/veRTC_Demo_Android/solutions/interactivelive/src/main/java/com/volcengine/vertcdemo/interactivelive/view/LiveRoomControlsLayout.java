@@ -8,16 +8,18 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.volcengine.vertcdemo.interactivelive.R;
 import com.volcengine.vertcdemo.interactivelive.core.LiveDataManager;
 import com.volcengine.vertcdemo.interactivelive.feature.liveroommain.IMainOption;
+import com.volcengine.vertcdemo.utils.DebounceClickListener;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-public class LiveRoomControlsLayout extends LinearLayout implements View.OnClickListener {
+public class LiveRoomControlsLayout extends LinearLayout {
 
     private ImageView mGiftBtn;
     private ImageView mCoHostBtn;
@@ -54,17 +56,17 @@ public class LiveRoomControlsLayout extends LinearLayout implements View.OnClick
     private void initView() {
         LayoutInflater.from(getContext()).inflate(R.layout.layout_live_room_controls, this, true);
         mGiftBtn = findViewById(R.id.live_room_gift);
-        mGiftBtn.setOnClickListener(this);
+        mGiftBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mCoHostBtn = findViewById(R.id.live_room_pk);
-        mCoHostBtn.setOnClickListener(this);
+        mCoHostBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mAddAudienceBtn = findViewById(R.id.live_room_lianmai);
-        mAddAudienceBtn.setOnClickListener(this);
+        mAddAudienceBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mEffectBtn = findViewById(R.id.live_room_effect);
-        mEffectBtn.setOnClickListener(this);
+        mEffectBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mSettingBtn = findViewById(R.id.live_room_setting);
-        mSettingBtn.setOnClickListener(this);
+        mSettingBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
         mHangUpBtn = findViewById(R.id.live_room_exit);
-        mHangUpBtn.setOnClickListener(this);
+        mHangUpBtn.setOnClickListener(DebounceClickListener.create(this::onClick));
     }
 
     public void setRole(@LiveDataManager.LiveRoleType int role,
@@ -83,8 +85,7 @@ public class LiveRoomControlsLayout extends LinearLayout implements View.OnClick
         }
     }
 
-    @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         if (mainOption == null) {
             return;
         }

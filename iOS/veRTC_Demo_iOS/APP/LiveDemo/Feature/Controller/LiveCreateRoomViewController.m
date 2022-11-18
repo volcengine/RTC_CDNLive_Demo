@@ -2,15 +2,15 @@
 //  CreateRoomViewController.m
 //  veRTC_Demo
 //
-//  Created by bytedance on 2021/5/18.
-//  Copyright © 2021 . All rights reserved.
+//  Created by on 2021/5/18.
+//  
 //
 
 #import "LiveCreateRoomViewController.h"
 #import "LiveCreateRoomControlView.h"
 #import "LiveCreateRoomTipView.h"
 #import "LiveRTCManager.h"
-#import "LiveRoomSettingCompoments.h"
+#import "LiveRoomSettingComponent.h"
 #import "LiveRoomViewController.h"
 #import "BytedEffectProtocol.h"
 
@@ -21,8 +21,8 @@
 @property (nonatomic, strong) UIButton *startButton;
 
 @property (nonatomic, strong) LiveCreateRoomControlView *controlView;
-@property (nonatomic, strong) LiveRoomSettingCompoments *settingCompoments;
-@property (nonatomic, strong) BytedEffectProtocol *beautyCompoments;
+@property (nonatomic, strong) LiveRoomSettingComponent *settingComponent;
+@property (nonatomic, strong) BytedEffectProtocol *beautyComponent;
 
 @property (nonatomic, strong) LiveRoomInfoModel *roomInfoModel;
 @property (nonatomic, copy) NSString *pushUrl;
@@ -43,9 +43,9 @@
 }
 
 - (void)startButtonAction:(UIButton *)sender {
-    sender.userInteractionEnabled = NO;
+    [[ToastComponent shareToastComponent] showLoading];
     __weak __typeof(self) wself = self;
-    [PublicParameterCompoments share].roomId = self.roomInfoModel.roomID;
+    [PublicParameterComponent share].roomId = self.roomInfoModel.roomID;
     [LiveRTMManager liveStartLive:self.roomInfoModel.roomID
                             block:^(LiveUserModel *hostUserModel,
                                            RTMACKModel * _Nonnull model) {
@@ -54,13 +54,13 @@
             LiveRoomViewController *next = [[LiveRoomViewController alloc]
                                             initWithRoomModel:self.roomInfoModel
                                             streamPushUrl:wself.pushUrl];
-            next.settingCompoments = wself.settingCompoments;
-            next.beautyCompoments = wself.beautyCompoments;
+            next.settingComponent = wself.settingComponent;
+            next.beautyComponent = wself.beautyComponent;
             [wself.navigationController pushViewController:next animated:YES];
         } else {
-            [[ToastComponents shareToastComponents] showWithMessage:model.message];
+            [[ToastComponent shareToastComponent] showWithMessage:model.message];
         }
-        sender.userInteractionEnabled = YES;
+        [[ToastComponent shareToastComponent] dismiss];
     }];
 }
 
@@ -99,7 +99,7 @@
 
 - (void)loadDataWithCreateLive {
     __weak __typeof(self) wself = self;
-    [LiveRTMManager liveCreateLive:[LocalUserComponents userModel].name
+    [LiveRTMManager liveCreateLive:[LocalUserComponent userModel].name
                                     block:^(LiveRoomInfoModel *roomInfoModel, LiveUserModel *hostUserModel, NSString *pushUrl, RTMACKModel *model) {
         if (model.result) {
             wself.roomInfoModel = roomInfoModel;
@@ -122,9 +122,9 @@
 - (void)setupLocalRenderView {
     [[LiveRTCManager shareRtc] enableLocalVideo:YES];
     [[LiveRTCManager shareRtc] enableLocalAudio:YES];
-    [[LiveRTCManager shareRtc] bingCanvasViewToUid:[LocalUserComponents userModel].uid];
+    [[LiveRTCManager shareRtc] bingCanvasViewToUid:[LocalUserComponent userModel].uid];
 
-    UIView *rtcStreamView = [[LiveRTCManager shareRtc] getStreamViewWithUid:[LocalUserComponents userModel].uid];
+    UIView *rtcStreamView = [[LiveRTCManager shareRtc] getStreamViewWithUid:[LocalUserComponent userModel].uid];
     rtcStreamView.hidden = NO;
     [self.renderView addSubview:rtcStreamView];
     [rtcStreamView mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -132,12 +132,12 @@
     }];
 
     // add effect
-    [self.beautyCompoments resumeLocalEffect];
+    [self.beautyComponent resumeLocalEffect];
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [_settingCompoments close];
-    [self.beautyCompoments close];
+    [_settingComponent close];
+    [self.beautyComponent close];
 }
 
 #pragma mark - LiveCreateRoomControlViewDelegate
@@ -147,17 +147,17 @@
 }
 
 - (void)liveCreateRoomControlView:(LiveCreateRoomControlView *)liveCreateRoomControlView didClickedBeautyButton:(UIButton *)button {
-    if (self.beautyCompoments) {
-        [self.beautyCompoments showWithType:EffectBeautyRoleTypeHost fromSuperView:self.view dismissBlock:^(BOOL result) {
+    if (self.beautyComponent) {
+        [self.beautyComponent showWithType:EffectBeautyRoleTypeHost fromSuperView:self.view dismissBlock:^(BOOL result) {
             
         }];
     } else {
-        [[ToastComponents shareToastComponents] showWithMessage:@"开源代码暂不支持美颜相关功能，体验效果请下载Demo"];
+        [[ToastComponent shareToastComponent] showWithMessage:@"开源代码暂不支持美颜相关功能，体验效果请下载Demo"];
     }
 }
 
 - (void)liveCreateRoomControlView:(LiveCreateRoomControlView *)liveCreateRoomControlView didClickedSettingButton:(UIButton *)button {
-    [self.settingCompoments showWithType:LiveRoomSettingTypeCreateRoom
+    [self.settingComponent showWithType:LiveRoomSettingTypeCreateRoom
                            fromSuperView:self.view
                                   roomID:self.roomInfoModel
                                userModel:nil];
@@ -202,18 +202,18 @@
     return _controlView;
 }
 
-- (LiveRoomSettingCompoments *)settingCompoments {
-    if (!_settingCompoments) {
-        _settingCompoments = [[LiveRoomSettingCompoments alloc] init];
+- (LiveRoomSettingComponent *)settingComponent {
+    if (!_settingComponent) {
+        _settingComponent = [[LiveRoomSettingComponent alloc] init];
     }
-    return _settingCompoments;
+    return _settingComponent;
 }
 
-- (BytedEffectProtocol *)beautyCompoments {
-    if (!_beautyCompoments) {
-        _beautyCompoments = [[BytedEffectProtocol alloc] initWithRTCEngineKit:[LiveRTCManager shareRtc].rtcEngineKit];
+- (BytedEffectProtocol *)beautyComponent {
+    if (!_beautyComponent) {
+        _beautyComponent = [[BytedEffectProtocol alloc] initWithRTCEngineKit:[LiveRTCManager shareRtc].rtcEngineKit];
     }
-    return _beautyCompoments;
+    return _beautyComponent;
 }
 
 - (void)dealloc {

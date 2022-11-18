@@ -9,14 +9,14 @@ import androidx.annotation.Nullable;
 
 import com.volcengine.vertcdemo.interactivelive.bean.LiveUserInfo;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class AudienceGroupLayout extends LinearLayout {
 
     private static final int COUNT = 6;
 
-    private final List<AudienceLayout> mAudienceLayouts = new LinkedList<>();
+    private final List<AudienceLayout> mAudienceLayouts = new ArrayList<>();
 
     private String mRoomId;
     private String mHostUserId;
