@@ -120,16 +120,7 @@ public class LiveRTSClient extends RTSBaseClient {
             data.isJoin = false;
             SolutionDemoEventManager.post(data);
         }));
-        putEventListener(new AbsBroadcast<>(ON_FINISH_LIVE, LiveFinishEvent.class, (data) -> {
-            SolutionDemoEventManager.post(data);
-            if (data.type == LiveDataManager.LIVE_FINISH_TYPE_TIMEOUT) {
-                SolutionToast.show("本次体验时间已超过20分钟");
-            } else if (data.type == LiveDataManager.LIVE_FINISH_TYPE_IRREGULARITY) {
-                SolutionToast.show("直播间内容违规，直播间已被关闭");
-            } else if (data.type == LiveDataManager.LIVE_FINISH_TYPE_NORMAL) {
-                SolutionToast.show("主播已关闭直播");
-            }
-        }));
+        putEventListener(new AbsBroadcast<>(ON_FINISH_LIVE, LiveFinishEvent.class, SolutionDemoEventManager::post));
         putEventListener(new AbsBroadcast<>(ON_LINK_MIC_STATUS, LinkMicStatusEvent.class,
                 SolutionDemoEventManager::post));
         putEventListener(new AbsBroadcast<>(ON_AUDIENCE_LINK_MIC_JOIN, AudienceLinkStatusEvent.class,
@@ -214,8 +205,12 @@ public class LiveRTSClient extends RTSBaseClient {
     }
 
     public void requestLiveReconnect(IRequestCallback<LiveReconnectResponse> callback) {
+        requestLiveReconnect("", callback);
+    }
+
+    public void requestLiveReconnect(String roomId, IRequestCallback<LiveReconnectResponse> callback) {
         JsonObject params = getCommonParams(CMD_LIVE_RECONNECT);
-        sendServerMessageOnNetwork("", params, LiveReconnectResponse.class, callback);
+        sendServerMessageOnNetwork(roomId, params, LiveReconnectResponse.class, callback);
     }
 
     public void updateMediaStatus(String roomId, @LiveDataManager.MediaStatus int micStatus, @LiveDataManager.MediaStatus int cameraStatus,

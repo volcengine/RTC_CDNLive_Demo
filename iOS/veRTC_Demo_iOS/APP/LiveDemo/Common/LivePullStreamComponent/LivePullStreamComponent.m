@@ -61,15 +61,20 @@
                 [wself updateWithStatus:status];
             }
         }];
-        if (roomModel.hostUserModel.videoSize.width > roomModel.hostUserModel.videoSize.height){
-            // 横屏流
-            // Horizontal video flow
-            [[LiveRTCManager shareRtc] updatePlayScaleMode:NO];
-        } else {
-            // 竖屏流
-            // Vertical video flow
-            [[LiveRTCManager shareRtc] updatePlayScaleMode:YES];
+        
+        if ((roomModel.hostUserModel.videoSize.width *
+             roomModel.hostUserModel.videoSize.height) > 0) {
+            if ((roomModel.hostUserModel.videoSize.width > roomModel.hostUserModel.videoSize.height)){
+                // 横屏流
+                // Horizontal video flow
+                [[LiveRTCManager shareRtc] updatePlayScaleMode:NO];
+            } else {
+                // 竖屏流
+                // Vertical video flow
+                [[LiveRTCManager shareRtc] updatePlayScaleMode:YES];
+            }
         }
+       
     }
     if (roomModel.hostUserModel) {
         [self updateHostMic:roomModel.hostUserModel.mic camera:roomModel.hostUserModel.camera];

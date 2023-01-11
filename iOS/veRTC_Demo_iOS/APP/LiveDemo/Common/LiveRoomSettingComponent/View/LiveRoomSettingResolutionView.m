@@ -40,7 +40,7 @@
           make.height.mas_equalTo(27);
         }];
 
-        NSArray *items = @[ @"480p", @"540p", @"720p", @"1080p" ];
+        NSArray *items = @[@"540p", @"720p", @"1080p" ];
 
         for (int i = 0; i < items.count; i++) {
             NSString *title = items[i];

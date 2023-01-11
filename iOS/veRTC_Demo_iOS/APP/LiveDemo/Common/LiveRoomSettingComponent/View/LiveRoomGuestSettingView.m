@@ -76,13 +76,6 @@
         [self.resolutionView mas_makeConstraints:^(MASConstraintMaker *make) {
           make.edges.equalTo(self);
         }];
-
-        //        __weak __typeof(self) wself = self;
-        //        [self.resolutionView setResolutionChangeBlock:^(NSInteger index) {
-        //            if ([wself.delegate respondsToSelector:@selector(liveRoomGuestSettingView:didChangeResolution:)]) {
-        //                [wself.delegate liveRoomGuestSettingView:wself didChangeResolution:index];
-        //            }
-        //        }];
     }
     return self;
 }

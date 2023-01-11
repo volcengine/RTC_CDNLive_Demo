@@ -182,7 +182,7 @@
 - (LiveCreateRoomTipView *)tipView {
     if (!_tipView) {
         _tipView = [[LiveCreateRoomTipView alloc] init];
-        _tipView.message = @"本产品仅用于功能体验，单次直播时长不超20mins";
+        _tipView.message = @"本产品仅用于功能体验，单次直播时长不超20分钟";
     }
     return _tipView;
 }

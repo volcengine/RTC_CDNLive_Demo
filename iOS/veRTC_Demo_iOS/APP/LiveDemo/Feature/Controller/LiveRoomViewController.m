@@ -253,6 +253,7 @@
         if (model.result) {
             if (reply == LiveInviteReplyPermitted) {
                 wself.linkerID = linkerID;
+                // 主播邀请，观众同意加入连麦
                 [wself.addGuestsComponent joinRTCRoomByToken:rtcToken
                                                     rtcRoomID:rtcRoomID
                                                        userID:[LocalUserComponent userModel].uid];
@@ -508,17 +509,20 @@
 }
 
 // Add Guests - All
+
 - (void)receivedAddGuestsSucceedWithUser:(LiveUserModel *)invitee
                                 linkerID:(NSString *)linkerID
                                rtcRoomID:(NSString *)rtcRoomID
                                 rtcToken:(NSString *)rtcToken {
     self.linkerID = linkerID;
     if (![self isHost]) {
-        // Guests update bottom ui
+        // 观众称为嘉宾更新底部UI
         [self.bottomView updateButtonRoleStatus:BottomRoleStatusGuests];
+        // 观众申请，主播同意加入连麦
         [self.addGuestsComponent joinRTCRoomByToken:rtcToken
-                                           rtcRoomID:rtcRoomID
-                                              userID:[LocalUserComponent userModel].uid];
+                                          rtcRoomID:rtcRoomID
+                                             userID:[LocalUserComponent userModel].uid];
+        [[ToastComponent shareToastComponent] showWithMessage:@"主播接受了您的连麦申请，即将开始连麦。"];
     }
 }
 
@@ -606,7 +610,7 @@
 - (void)receivedLiveEnd:(BOOL)isKick type:(NSString *)type {
     if (!isKick) {
         if ([type integerValue] == 2) {
-            [[ToastComponent shareToastComponent] showWithMessage:@"本次体验时间已超过20mins" delay:0.8];
+            [[ToastComponent shareToastComponent] showWithMessage:@"本次体验时间已超过20分钟" delay:0.8];
         } else if ([type integerValue] == 3) {
             [[ToastComponent shareToastComponent] showWithMessage:@"直播间内容违规，直播间已被关闭" delay:0.8];
         } else {
@@ -929,7 +933,7 @@
     if ([self isHost]) {
         [[LiveRTCManager shareRtc] joinRTCRoomByToken:roomModel.rtcToken
                                              rtcRoomID:roomModel.rtcRoomId
-                                               userID:[LocalUserComponent userModel].uid];
+                                                userID:[LocalUserComponent userModel].uid];
     }
     // Join RTS/RTC room callback
     __weak __typeof(self) wself = self;

@@ -36,7 +36,6 @@ import android.text.style.ImageSpan;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -88,6 +87,7 @@ import com.volcengine.vertcdemo.interactivelive.event.LiveFinishEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveHasBlockEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveKickUserEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveReconnectEvent;
+import com.volcengine.vertcdemo.interactivelive.event.LiveReconnectToRoomEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LiveRoomUserEvent;
 import com.volcengine.vertcdemo.interactivelive.event.LocalKickUserEvent;
 import com.volcengine.vertcdemo.interactivelive.event.MediaChangedEvent;
@@ -396,6 +396,9 @@ public class LiveRoomMainActivity extends BaseActivity {
                 @Override
                 public void onError(int errorCode, String message) {
                     showToast(ErrorTool.getErrorMessageByErrorCode(errorCode, message));
+                    if (ErrorTool.shouldLeaveRoom(errorCode)) {
+                        finish();
+                    }
                 }
             };
 
@@ -1045,7 +1048,7 @@ public class LiveRoomMainActivity extends BaseActivity {
         if (event.isJoin) {
             chatMessage = String.format(Locale.US, "%s 加入了房间", event.audienceUserName);
         } else {
-            chatMessage = String.format(Locale.US, "%s 离开了房间", event.audienceUserName);
+            chatMessage = String.format(Locale.US, "%s 退出了房间", event.audienceUserName);
         }
         addChatMessage(chatMessage);
 
@@ -1055,6 +1058,13 @@ public class LiveRoomMainActivity extends BaseActivity {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onLiveFinishEvent(LiveFinishEvent event) {
         if (TextUtils.equals(event.roomId, mLiveRoomInfo.roomId)) {
+            if (event.type == LiveDataManager.LIVE_FINISH_TYPE_TIMEOUT) {
+                SolutionToast.show("本场直播体验已超过20分钟");
+            } else if (event.type == LiveDataManager.LIVE_FINISH_TYPE_IRREGULARITY) {
+                SolutionToast.show("直播间内容违规，直播间已被关闭");
+            } else if (event.type == LiveDataManager.LIVE_FINISH_TYPE_NORMAL && mSelfInfo.role != USER_ROLE_HOST) {
+                SolutionToast.show("主播已关闭直播");
+            }
             finish();
         }
     }
@@ -1153,6 +1163,13 @@ public class LiveRoomMainActivity extends BaseActivity {
         } else {
             showToast("嘉宾暂时离开");
         }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onLiveReconnectEvent(LiveReconnectToRoomEvent event) {
+        LiveRTCManager.ins().getRTSClient().requestLiveReconnect(
+                mLiveRoomInfo.roomId,
+                mLiveReconnectCallback);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

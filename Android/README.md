@@ -32,47 +32,23 @@
 
 ### 步骤 3：构建工程
 
-1. 使用 Android Studio 打开该项目的`RTC_CDNLive_Demo-master/Android/veRTC_Demo_Android` 文件夹
+1. 使用 Android Studio 打开该项目的`RTC_CDNLive_Demo/Android/veRTC_Demo_Android` 文件夹
 	
+2. 填写 **HEAD_URL。** <br>
+    进入 `scene-core/gradle.properties` 文件，填写 **HEAD_URL**。<br>
+    当前你可以使用 **`https://common.rtc.volcvideo.com/rtc_demo_special`** 作为测试服务器域名，仅提供跑通测试服务，无法保障正式需求。<br>
+        <img src="https://portal.volccdn.com/obj/volcfe/cloud-universal-doc/upload_15703882819ea292a62bd928120e3047.png" width="500px" >
 
-2. 填写 **LoginUrl。** 
-	
-
-进入 `scene-core/gradle.properties` 文件，填写 **LoginUrl**。
-
-当前你可以使用 **`https://common.rtc.volcvideo.com/rtc_demo_special/login`** 作为测试服务器域名，仅提供跑通测试服务，无法保障正式需求。
-
-<img src="https://lf3-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_6fe99d7fedb876b9039412d6fb4452a9" width="500px" >
-
-3. **填写 APPID、APPKey、AccessKeyID、SecretAccessKey**
-	
-
-进入 `component/joinrtsparams` 目录下 `gradle.properties`文件，使用从火山引擎控制台获取的 **APPID、APPKey、AccessKeyID、SecretAccessKey 填写到该文件相应位置。** 
-
-> ACCOUNT\_ID 和 VOD\_SPACE 为录制相关功能配置参数，此 Demo 无录制功能，填 `1` 即可。
-
-<img src="https://lf3-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_f0b390ab03b9e7daed04797a51e5e285" width="500px" >
-
+3. **填写 APPID、APPKey、AccessKeyID、SecretAccessKey**<br>
+	进入 `component/joinrtsparams` 目录下 `gradle.properties`文件，使用从火山引擎控制台获取的 **APPID、APPKey、AccessKeyID、SecretAccessKey 填写到该文件相应位置。** <br>
+    <img src="https://portal.volccdn.com/obj/volcfe/cloud-universal-doc/upload_7de621528819a3a73e847b48f1ff8cee.png" width="500px" >
 ### 步骤 4：编译运行
 
-1. 将手机连接到电脑，并在开发者选项中打开调试功能。连接成功后，设备名称会出现在界面右上方。
-	
+1. 将手机连接到电脑，并在开发者选项中打开调试功能。连接成功后，设备名称会出现在界面右上方。<br>
 	<img src="https://lf6-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_a3163f320ee03bd4623fdc3dc059f6c8" width="500px" >
-	
+2. 选择**Run** -> **Run**，开始编译。编译成功后你的 Android 设备上会出现新应用。部分手机会出现二次确认，请选择确认安装。<br>
+	<img src="https://lf3-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_5aaaf69c03941afa052bbc6c3371c19b" width="500px" >
 
-<br>
-
-2. 选择**Run** -> **Run**，开始编译。编译成功后你的 Android 设备上会出现新应用。部分手机会出现二次确认，请选择确认安装。
-	
-
-<img src="https://lf3-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_5aaaf69c03941afa052bbc6c3371c19b" width="500px" >
-
-运行开始界面如下：
-<br>
+## 运行开始界面
 
 <img src="https://lf6-volc-editor.volccdn.com/obj/volcfe/sop-public/upload_32893513009de2a3f96893f7f370f658" width="200px" >
-<br>
-
-<br>
-
-<br>

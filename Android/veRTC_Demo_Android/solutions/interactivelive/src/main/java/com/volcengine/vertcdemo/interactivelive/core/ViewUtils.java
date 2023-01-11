@@ -1,5 +1,6 @@
 package com.volcengine.vertcdemo.interactivelive.core;
 
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -20,5 +21,14 @@ public class ViewUtils {
             rootView.findViewById(id).setEnabled(enable);
             rootView.findViewById(id).setClickable(enable);
         }
+    }
+
+    public static void handleViewClick(View view) {
+        if (view == null) {
+            return;
+        }
+
+        view.setEnabled(false);
+        view.postDelayed(() -> view.setEnabled(true), 500L);
     }
 }

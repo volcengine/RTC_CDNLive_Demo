@@ -60,6 +60,7 @@
     ByteRTCVideoCaptureConfig *captureConfig = [[ByteRTCVideoCaptureConfig alloc] init];
     captureConfig.videoSize = CGSizeMake(1280, 720);
     captureConfig.frameRate = 15;
+    captureConfig.preference = ByteRTCVideoCapturePreferenceAutoPerformance;
     [self.rtcEngineKit setVideoCaptureConfig:captureConfig];
     
     // Encoder config

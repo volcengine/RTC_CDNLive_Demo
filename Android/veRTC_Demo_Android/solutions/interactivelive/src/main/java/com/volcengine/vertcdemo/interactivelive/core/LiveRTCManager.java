@@ -38,6 +38,7 @@ import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
 import com.volcengine.vertcdemo.core.net.rts.RTCRoomEventHandlerWithRTS;
 import com.volcengine.vertcdemo.core.net.rts.RTCVideoEventHandlerWithRTS;
 import com.volcengine.vertcdemo.core.net.rts.RTSInfo;
+import com.volcengine.vertcdemo.interactivelive.event.LiveReconnectToRoomEvent;
 import com.volcengine.vertcdemo.interactivelive.event.MediaChangedEvent;
 import com.volcengine.vertcdemo.interactivelive.event.NetworkConnectEvent;
 import com.volcengine.vertcdemo.interactivelive.event.NetworkQualityEvent;
@@ -45,6 +46,7 @@ import com.volcengine.vertcdemo.interactivelive.event.UpdatePullStreamEvent;
 
 import org.webrtc.VideoFrame;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -147,6 +149,8 @@ public class LiveRTCManager {
                 if (mSingleLiveInfo != null) {
                     startLiveTranscoding(roomId, uid, mSingleLiveInfo.pushUrl);
                 }
+            } else if (isReconnectSuccess(state, extraInfo)) {
+                SolutionDemoEventManager.post(new LiveReconnectToRoomEvent());
             }
         }
 

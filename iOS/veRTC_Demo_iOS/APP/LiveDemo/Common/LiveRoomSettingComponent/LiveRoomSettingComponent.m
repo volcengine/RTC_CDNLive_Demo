@@ -205,15 +205,12 @@
     NSString *streamKey;
     switch (index) {
         case 0: {
-            streamKey = @"480";
-        } break;
-        case 1: {
             streamKey = @"540";
         } break;
-        case 2: {
+        case 1: {
             streamKey = @"720";
         } break;
-        case 3: {
+        case 2: {
             streamKey = @"1080";
         } break;
         default: {
