@@ -127,23 +127,6 @@
 
 - (void)setIsSwitchCamera:(BOOL)isSwitchCamera {
     _isSwitchCamera = isSwitchCamera;
-    
-    LiveSettingItemButton *switchCamera = nil;
-    for (LiveSettingItemButton *button in self.buttons) {
-        if (button.tag == 0) {
-            switchCamera = button;
-            break;
-        }
-    }
-    if (switchCamera) {
-        if (isSwitchCamera) {
-            switchCamera.alpha = 1;
-            switchCamera.userInteractionEnabled = YES;
-        } else {
-            switchCamera.alpha = 0.34;
-            switchCamera.userInteractionEnabled = NO;
-        }
-    }
 }
 
 #pragma mark - Private Action

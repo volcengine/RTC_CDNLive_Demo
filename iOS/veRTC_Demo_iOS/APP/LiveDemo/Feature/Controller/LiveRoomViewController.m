@@ -523,6 +523,7 @@
                                           rtcRoomID:rtcRoomID
                                              userID:[LocalUserComponent userModel].uid];
         [[ToastComponent shareToastComponent] showWithMessage:@"主播接受了您的连麦申请，即将开始连麦。"];
+        [self.beautyComponent resumeLocalEffect];
     }
 }
 
