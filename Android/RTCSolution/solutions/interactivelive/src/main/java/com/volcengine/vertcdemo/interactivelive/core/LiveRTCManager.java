@@ -30,12 +30,19 @@ import com.ss.bytertc.engine.data.StreamIndex;
 import com.ss.bytertc.engine.live.ByteRTCStreamMixingEvent;
 import com.ss.bytertc.engine.live.ByteRTCStreamMixingType;
 import com.ss.bytertc.engine.live.ByteRTCTranscoderErrorCode;
-import com.ss.bytertc.engine.live.ILiveTranscodingObserver;
-import com.ss.bytertc.engine.live.LiveTranscoding;
+import com.ss.bytertc.engine.live.IMixedStreamObserver;
+import com.ss.bytertc.engine.live.MixedStreamConfig;
+import com.ss.bytertc.engine.live.MixedStreamConfig.MixedStreamLayoutRegionConfig;
+import com.ss.bytertc.engine.live.MixedStreamConfig.MixedStreamVideoConfig;
+import com.ss.bytertc.engine.live.MixedStreamConfig.MixedStreamAudioConfig;
+import com.ss.bytertc.engine.live.MixedStreamConfig.MixedStreamLayoutConfig;
+import com.ss.bytertc.engine.live.MixedStreamConfig.MixedStreamRenderMode;
+import com.ss.bytertc.engine.live.MixedStreamType;
 import com.ss.bytertc.engine.type.ChannelProfile;
 import com.ss.bytertc.engine.type.MediaStreamType;
 import com.ss.bytertc.engine.type.NetworkQualityStats;
 import com.ss.bytertc.engine.video.VideoCaptureConfig;
+import com.ss.bytertc.engine.video.VideoFrame;
 import com.volcengine.vertcdemo.core.SolutionDataManager;
 import com.volcengine.vertcdemo.core.eventbus.SolutionDemoEventManager;
 import com.volcengine.vertcdemo.core.net.rts.RTCRoomEventHandlerWithRTS;
@@ -50,10 +57,9 @@ import com.volcengine.vertcdemo.protocol.IEffect;
 import com.volcengine.vertcdemo.protocol.ProtocolUtil;
 import com.volcengine.vertcdemo.utils.AppUtil;
 
-import org.webrtc.VideoFrame;
-
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,9 +67,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ *
  * RTC 接口封装类
  */
+
+/**
+ * {en}
+ * RTC interface encapsulation class
+ */
 public class LiveRTCManager {
+    public static final String KEY_SEI_KEY_SOURCE = "kLiveCoreSEIKEYSource";
+    public static final String KEY_SEI_VALUE_SOURCE_NONE = "kLiveCoreSEIValueSourceNone";
+    public static final String KEY_SEI_VALUE_SOURCE_CO_HOST = "kLiveCoreSEIValueSourceCoHost";
 
     private static final String TAG = "LiveRTCManager";
 
@@ -80,7 +95,7 @@ public class LiveRTCManager {
     // 是否正在pk
     private boolean mIsPk = false;
     // 合流转推参数
-    private LiveTranscoding mLiveTranscoding = null;
+    private MixedStreamConfig mMixedStreamConfig = null;
 
     // 主播的视频采集参数
     private final LiveSettingConfig mHostConfig = new LiveSettingConfig(
@@ -124,7 +139,8 @@ public class LiveRTCManager {
     // RTS对象，用来实现业务服务器的长链接
     private RTCRoom mRTSRoom = null;
     // RTS 长链接回调
-    private final RTCRoomEventHandlerWithRTS mRTSRoomEventHandler = new RTCRoomEventHandlerWithRTS() {};
+    private final RTCRoomEventHandlerWithRTS mRTSRoomEventHandler = new RTCRoomEventHandlerWithRTS() {
+    };
 
     private final RTCVideoEventHandlerWithRTS mRTCVideoEventHandler = new RTCVideoEventHandlerWithRTS() {
 
@@ -159,6 +175,10 @@ public class LiveRTCManager {
     /**
      * RTC 房间事件回调
      */
+    /**
+     * {en}
+     * RTC room event callback
+     */
     private final RTCRoomEventHandlerWithRTS mRTCRoomEventHandler = new RTCRoomEventHandlerWithRTS() {
 
         @Override
@@ -169,7 +189,7 @@ public class LiveRTCManager {
             mRoomId = roomId;
             if (isFirstJoinRoomSuccess(state, extraInfo)) {
                 if (mSingleLiveInfo != null) {
-                    startLiveTranscoding(roomId, uid, mSingleLiveInfo.pushUrl);
+                    startPushMixedStreamToCDN(roomId, uid, mSingleLiveInfo.pushUrl);
                 }
             } else if (isReconnectSuccess(state, extraInfo)) {
                 SolutionDemoEventManager.post(new SDKReconnectToRoomEvent());
@@ -240,22 +260,23 @@ public class LiveRTCManager {
     };
 
     // 保存连麦主播的信息
-    private LiveTranscodingInfo mCoHostInfo;
+    private MixedStreamInfo mCoHostInfo;
     // 保存当前主播用户的信息
-    private LiveTranscodingInfo mSingleLiveInfo;
+    private MixedStreamInfo mSingleLiveInfo;
     private List<String> mAudienceUserIdList;
 
-    private static class LiveTranscodingInfo {
+    private static class MixedStreamInfo {
         public String pushUrl;
         public String selfRoomId;
         public String selfUserId;
         public String coHostRoomId;
         public String coHostUserId;
 
-        private LiveTranscodingInfo() {}
+        private MixedStreamInfo() {
+        }
 
-        public LiveTranscodingInfo(String pushUrl, String selfRoomId, String selfUserId, String coHostRoomId,
-                                   String coHostUserId) {
+        public MixedStreamInfo(String pushUrl, String selfRoomId, String selfUserId, String coHostRoomId,
+                               String coHostUserId) {
             this.pushUrl = pushUrl;
             this.selfRoomId = selfRoomId;
             this.selfUserId = selfUserId;
@@ -270,7 +291,8 @@ public class LiveRTCManager {
         public int frameRate;
         public int bitRate;
 
-        public LiveSettingConfig(){}
+        public LiveSettingConfig() {
+        }
 
         public LiveSettingConfig(int width, int height, int frameRate, int bitRate) {
             this.width = width;
@@ -398,9 +420,13 @@ public class LiveRTCManager {
     /**
      * 其余情况离房，需要重置状态
      */
+    /**
+     * {en}
+     * Leave the room in other cases, you need to reset the status
+     */
     public void leaveRoom() {
         Log.d(TAG, "leaveRoom");
-        stopLiveTranscoding();
+        stopPushMixedStreamToCDN();
         if (mRTCRoom != null) {
             mRTCRoom.leaveRoom();
             mRTCRoom.destroy();
@@ -527,6 +553,13 @@ public class LiveRTCManager {
      * @param uid 用户id
      * @param mute 是否静音
      */
+    /**
+     * {en}
+     * mute remote audio
+     *
+     * @param uid  user id
+     * @param mute Whether to mute
+     */
     public void muteRemoteAudio(String uid, boolean mute) {
         Log.d(TAG, "muteRemoteAudio uid:" + uid + ",mute:" + mute);
         if (mRTCRoom != null) {
@@ -650,7 +683,7 @@ public class LiveRTCManager {
         mRTSRoom = null;
     }
 
-    private final ILiveTranscodingObserver mILiveTranscodingObserver = new ILiveTranscodingObserver() {
+    private final IMixedStreamObserver mMixedStreamObserver = new IMixedStreamObserver() {
         /**
          * 客户端是否具有推流能力。
          * @return false：不具备推流能力（默认值）
@@ -668,18 +701,19 @@ public class LiveRTCManager {
          * @param mixType 转推直播类型
          */
         @Override
-        public void onStreamMixingEvent(ByteRTCStreamMixingEvent eventType, String taskId,
-                                        ByteRTCTranscoderErrorCode error, ByteRTCStreamMixingType mixType) {
-            Log.d(TAG, String.format("onStreamMixingEvent: %s %s", eventType, error));
+        public void onMixingEvent(ByteRTCStreamMixingEvent eventType, String taskId,
+                                  ByteRTCTranscoderErrorCode error, MixedStreamType mixType) {
+            Log.d(TAG, String.format("onMixingEvent: %s %s", eventType, error));
         }
 
         @Override
-        public void onMixingAudioFrame(String taskId, byte[] audioFrame, int frameNum, long timeStampMs) {
+        public void onMixingAudioFrame(String taskId, byte[] audioFrame,
+                                       int frameNum, long timeStampMs) {
 
         }
 
         @Override
-        public void onMixingVideoFrame(String taskId, VideoFrame VideoFrame) {
+        public void onMixingVideoFrame(String taskId, VideoFrame videoFrame) {
 
         }
 
@@ -689,13 +723,15 @@ public class LiveRTCManager {
         }
 
         @Override
-        public void onCacheSyncVideoFrames(String taskId, String[] userIds, VideoFrame[] videoFrame, byte[][] dataFrame, int count) {
+        public void onCacheSyncVideoFrames(String taskId, String[] userIds,
+                                           VideoFrame[] videoFrame, byte[][] dataFrame, int count) {
 
         }
+
     };
 
     public void setSingleLiveInfo(String roomId, String userId, String pushUrl) {
-        mSingleLiveInfo = new LiveTranscodingInfo(pushUrl, roomId, userId, null, null);
+        mSingleLiveInfo = new MixedStreamInfo(pushUrl, roomId, userId, null, null);
     }
 
     /**
@@ -704,67 +740,85 @@ public class LiveRTCManager {
      * @param userId 用户id
      * @param liveUrl rtmp 推流地址
      */
-    private void startLiveTranscoding(String roomId, String userId, String liveUrl) {
-        Log.d(TAG, String.format("startLiveTranscoding: %s  %s  %s", roomId, userId, liveUrl));
+    /**
+     * {en}
+     * Turn on live transcoding
+     *
+     * @param roomId  room id
+     * @param userId  user id
+     * @param liveUrl rtmp streaming address
+     */
+    private void startPushMixedStreamToCDN(String roomId, String userId, String liveUrl) {
+        Log.d(TAG, String.format("startPushMixedStreamToCDN: %s  %s  %s", roomId, userId, liveUrl));
         mRoomId = roomId;
-        LiveTranscoding liveTranscoding = LiveTranscoding.getDefualtLiveTranscode();
-        // 设置房间id
-        liveTranscoding.setRoomId(roomId);
-        // 设置用户id
-        liveTranscoding.setUserId(userId);
-        // 设置推流的直播地址
-        liveTranscoding.setUrl(liveUrl);
-        // 设置合流模式，0 代表服务端合流
-        liveTranscoding.setMixType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
+        MixedStreamConfig config = MixedStreamConfig.defaultMixedStreamConfig();
+        config.setRoomID(roomId);
+        config.setUserID(userId);
+        config.setPushURL(liveUrl);
+        config.setExpectedMixingType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
 
         // 设置合流视频参数，具体参数根据情况而定
-        LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
+        MixedStreamVideoConfig videoConfig = config.getVideoConfig();
         videoConfig.setWidth(mHostConfig.width);
         videoConfig.setHeight(mHostConfig.height);
         videoConfig.setFps(mHostConfig.frameRate);
-        videoConfig.setKBitRate(mHostConfig.bitRate);
-        liveTranscoding.setVideo(videoConfig);
+        videoConfig.setBitrate(mHostConfig.bitRate);
+        config.setVideoConfig(videoConfig);
 
         // 设置合流音频参数，具体参数根据情况而定
-        LiveTranscoding.AudioConfig audioConfig = liveTranscoding.getAudio();
+        MixedStreamAudioConfig audioConfig = config.getAudioConfig();
         audioConfig.setSampleRate(44100);
         audioConfig.setChannels(2);
-        liveTranscoding.setAudio(audioConfig);
+        config.setAudioConfig(audioConfig);
 
         // 设置合流视频布局参数
-        LiveTranscoding.Layout.Builder layoutBuilder = new LiveTranscoding.Layout.Builder();
-        LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
-        selfRegion.uid(userId);
-        selfRegion.roomId(roomId);
-        selfRegion.position(0, 0);
-        selfRegion.size(1, 1);
-        selfRegion.alpha(1);
-        selfRegion.zorder(0);
-        selfRegion.renderMode(LiveTranscoding.TranscoderRenderMode.RENDER_HIDDEN);
-        layoutBuilder.addRegion(selfRegion);
-        JsonObject json = new JsonObject();
-        json.addProperty("kLiveCoreSEIKEYSource", "kLiveCoreSEIValueSourceNone");
-        layoutBuilder.appData(json.toString());
-        liveTranscoding.setLayout(layoutBuilder.builder());
+        MixedStreamLayoutRegionConfig localRegionConfig = new MixedStreamLayoutRegionConfig();
+        localRegionConfig.setUserID(userId);
+        localRegionConfig.setIsLocalUser(true);
+        localRegionConfig.setRoomID(roomId);
+        localRegionConfig.setLocationX(0);
+        localRegionConfig.setLocationY(0);
+        localRegionConfig.setWidthProportion(1);
+        localRegionConfig.setHeightProportion(1);
+        localRegionConfig.setAlpha(1);
+        localRegionConfig.setZOrder(0);
+        localRegionConfig.setRenderMode(MixedStreamRenderMode.MIXED_STREAM_RENDER_MODE_HIDDEN);
 
+        MixedStreamLayoutRegionConfig[] regions = new MixedStreamLayoutRegionConfig[]{localRegionConfig};
+        MixedStreamLayoutConfig layoutConfig = new MixedStreamLayoutConfig();
+        JsonObject json = new JsonObject();
+        json.addProperty(KEY_SEI_KEY_SOURCE, KEY_SEI_VALUE_SOURCE_NONE);
+        layoutConfig.setUserConfigExtraInfo(json.toString());
+        layoutConfig.setRegions(regions);
+        config.setLayout(layoutConfig);
         // 开始合流任务，taskid使用空字符串即可
-        mRTCVideo.startLiveTranscoding("", liveTranscoding, mILiveTranscodingObserver);
+        mRTCVideo.startPushMixedStreamToCDN("", config, mMixedStreamObserver);
     }
 
     /**
      * 停止合流转推
      */
-    public void stopLiveTranscoding() {
+    /**
+     * {en}
+     * stop live transcoding
+     */
+    public void stopPushMixedStreamToCDN() {
         Log.d(TAG, "stopLiveTranscoding");
         if (mRTCVideo != null) {
-            mRTCVideo.stopLiveTranscoding("");
+            mRTCVideo.stopPushStreamToCDN("");
         }
-        mLiveTranscoding = null;
+        mMixedStreamConfig = null;
     }
 
     /**
      * PK时调整编码分辨率，调整为单独直播时一半
      * @param adjust true表示调整，false表示恢复
+     */
+    /**
+     * {en}
+     * Adjust the encoding resolution during PK, and adjust it to half of the live broadcast alone
+     *
+     * @param adjust true means adjustment, false means recovery
      */
     private void adjustResolutionWhenPK(boolean adjust, int coHostWidth, int coHostHeight) {
         if (mRTCVideo == null) {
@@ -793,83 +847,89 @@ public class LiveRTCManager {
      * @param coHostRoomId 对方房间id
      * @param coHostUserId 对方主播的用户Id
      */
+    /**
+     * {en}
+     * Update live transcoding parameters
+     *
+     * @param isStart      Whether it is pk start
+     * @param selfRoomId   room id
+     * @param selfUserId   user Id
+     * @param coHostRoomId The other party's room id
+     * @param coHostUserId The host's user ID
+     */
     public void updateLiveTranscodingWithHost(boolean isStart, String liveUrl, String selfRoomId,
-                                               String selfUserId, String coHostRoomId, String coHostUserId) {
+                                              String selfUserId, String coHostRoomId, String coHostUserId) {
 
         mIsTranscoding = isStart;
         mIsPk = isStart;
         adjustResolutionWhenPK(isStart, mCoHostVideoWidth, mCoHostVideoHeight);
 
-        LiveTranscoding liveTranscoding = LiveTranscoding.getDefualtLiveTranscode();
-        // 设置房间id
-        liveTranscoding.setRoomId(selfRoomId);
-        // 设置推流的直播地址
-        liveTranscoding.setUrl(liveUrl);
-        // 设置合流模式，0 代表服务端合流
-        liveTranscoding.setMixType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
-
+        MixedStreamConfig config = MixedStreamConfig.defaultMixedStreamConfig();
+        config.setRoomID(selfRoomId);
+        config.setPushURL(liveUrl);
+        config.setExpectedMixingType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
         // 设置合流视频参数，具体参数根据情况而定
         // Set the merged live transcoding parameters, the specific parameters depend on the situation
-        LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
+        MixedStreamVideoConfig videoConfig = config.getVideoConfig();
         videoConfig.setWidth(mHostConfig.width);
         videoConfig.setHeight(mHostConfig.height);
         videoConfig.setFps(mHostConfig.frameRate);
-        videoConfig.setKBitRate(mHostConfig.bitRate);
-        liveTranscoding.setVideo(videoConfig);
-
+        videoConfig.setBitrate(mHostConfig.bitRate);
         // 设置合流音频参数，具体参数根据情况而定
-        LiveTranscoding.AudioConfig audioConfig = liveTranscoding.getAudio();
+        MixedStreamAudioConfig audioConfig = config.getAudioConfig();
         audioConfig.setSampleRate(44100);
         audioConfig.setChannels(2);
-        liveTranscoding.setAudio(audioConfig);
 
-        LiveTranscoding.Layout.Builder layoutBuilder = new LiveTranscoding.Layout.Builder();
-        if (isStart) {
-            LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
-            selfRegion.uid(selfUserId);
-            selfRegion.setLocalUser(true);
-            selfRegion.roomId(selfRoomId);
-            // 设置用户视频布局的相对位置，取值范围[0, 1]，(0,0)为左上角，根据实际情况调整
-            // (0,0) is the upper left corner, adjust according to the actual situation
-            selfRegion.position(0, 0.25);
-            // 设置用户视频相对大小，取值范围[0, 1]，根据实际情况调整
-            selfRegion.size(0.5, 0.5);
-            // 设置透明度，取值范围[0, 1]，0代表完全透明
-            selfRegion.alpha(1);
-            // 设置用户视频布局在画布中的层级，取值范围为[0 - 100]。0为底层，值越大越上层。
-            selfRegion.zorder(0);
-            layoutBuilder.addRegion(selfRegion);
+        MixedStreamLayoutConfig layoutConfig = new MixedStreamLayoutConfig();
+        if (isStart){
+            MixedStreamLayoutRegionConfig localRegion = new MixedStreamLayoutRegionConfig();
+            localRegion.setUserID(selfUserId);
+            localRegion.setIsLocalUser(true);
+            localRegion.setRoomID(selfRoomId);
+            localRegion.setLocationX(0);
+            localRegion.setLocationY(0.25);
+            localRegion.setWidthProportion(0.5);
+            localRegion.setHeightProportion(0.5);
+            localRegion.setAlpha(1);
+            localRegion.setZOrder(0);
 
-            LiveTranscoding.Region hostRegion = new LiveTranscoding.Region();
-            hostRegion.uid(coHostUserId);
-            hostRegion.setLocalUser(false);
-            hostRegion.roomId(selfRoomId);
-            hostRegion.position(0.5, 0.25);
-            hostRegion.size(0.5, 0.5);
-            hostRegion.alpha(1);
-            hostRegion.zorder(0);
-            layoutBuilder.addRegion(hostRegion);
+            MixedStreamLayoutRegionConfig hostRegion = new MixedStreamLayoutRegionConfig();
+            hostRegion.setUserID(coHostUserId);
+            hostRegion.setIsLocalUser(false);
+            hostRegion.setRoomID(selfRoomId);
+            hostRegion.setLocationX(0.5);
+            hostRegion.setLocationY(0.25);
+            hostRegion.setWidthProportion(0.5);
+            hostRegion.setHeightProportion(0.5);
+            hostRegion.setAlpha(1);
+            hostRegion.setZOrder(0);
+
             JsonObject json = new JsonObject();
-            json.addProperty("kLiveCoreSEIKEYSource", "kLiveCoreSEIValueSourceCoHost");
-            layoutBuilder.appData(json.toString());
-            liveTranscoding.setLayout(layoutBuilder.builder());
-        } else {
-            LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
-            selfRegion.uid(selfUserId);
-            selfRegion.setLocalUser(true);
-            selfRegion.roomId(selfRoomId);
-            selfRegion.position(0, 0);
-            selfRegion.size(1, 1);
-            selfRegion.alpha(1);
-            selfRegion.zorder(0);
-            layoutBuilder.addRegion(selfRegion);
+            json.addProperty(KEY_SEI_KEY_SOURCE, KEY_SEI_VALUE_SOURCE_CO_HOST);
+            layoutConfig.setUserConfigExtraInfo(json.toString());
+            layoutConfig.setRegions(new MixedStreamLayoutRegionConfig[]{localRegion,hostRegion});
+            config.setLayout(layoutConfig);
+        }else {
+            MixedStreamLayoutRegionConfig localRegion = new MixedStreamLayoutRegionConfig();
+            localRegion.setUserID(selfUserId);
+            localRegion.setIsLocalUser(true);
+            localRegion.setRoomID(selfRoomId);
+            localRegion.setLocationX(0);
+            localRegion.setLocationY(0);
+            localRegion.setWidthProportion(1);
+            localRegion.setHeightProportion(1);
+            localRegion.setAlpha(1);
+            localRegion.setZOrder(0);
+
             JsonObject json = new JsonObject();
-            json.addProperty("kLiveCoreSEIKEYSource", "kLiveCoreSEIValueSourceNone");
-            layoutBuilder.appData(json.toString());
-            liveTranscoding.setLayout(layoutBuilder.builder());
+            json.addProperty(KEY_SEI_KEY_SOURCE, KEY_SEI_VALUE_SOURCE_NONE);
+            layoutConfig.setUserConfigExtraInfo(json.toString());
+            layoutConfig.setRegions(new MixedStreamLayoutRegionConfig[]{localRegion});
+            config.setLayout(layoutConfig);
         }
-        mLiveTranscoding = liveTranscoding;
-        mRTCVideo.updateLiveTranscoding("", liveTranscoding);
+
+        mMixedStreamConfig = config;
+        mRTCVideo.updatePushMixedStreamToCDN("", mMixedStreamConfig);
     }
 
 
@@ -878,35 +938,42 @@ public class LiveRTCManager {
      * @param userId 用户userId
      * @param isMute 是否是静音
      */
+    /**
+     * {en}
+     * When mute the host of the other party, you need to modify the live transcoding parameters
+     *
+     * @param userId user userId
+     * @param isMute whether it is mute
+     */
     public void updateLiveTranscodingWhenMuteCoHost(String userId, boolean isMute) {
         if (TextUtils.isEmpty(userId)) {
             Log.d(TAG, "muteCoHost() failed, userId is empty");
             return;
         }
-        if (mLiveTranscoding == null || !mIsPk || mCoHostInfo == null) {
+        if (mMixedStreamConfig == null || !mIsPk || mCoHostInfo == null) {
             Log.d(TAG, "muteCoHost() failed, LiveTranscoding params error");
             return;
         }
-        LiveTranscoding.Layout layout = mLiveTranscoding.getLayout();
+        MixedStreamLayoutConfig layout = mMixedStreamConfig.getLayout();
         if (layout == null) {
             Log.d(TAG, "muteCoHost() failed, layout is null");
             return;
         }
-        LiveTranscoding.Region[] regions = layout.getRegions();
+        MixedStreamLayoutRegionConfig[] regions = layout.getRegions();
         if (regions == null) {
             Log.d(TAG, "muteCoHost() failed, regions is null");
             return;
         }
-        for (LiveTranscoding.Region region : regions) {
-            if (region != null && !region.isLocalUser() && TextUtils.equals(userId, mCoHostInfo.coHostUserId)) {
-                region.contentControl(isMute
-                        ? LiveTranscoding.TranscoderContentControlType.HAS_VIDEO_ONLY
-                        : LiveTranscoding.TranscoderContentControlType.HAS_AUDIO_AND_VIDEO);
+        for (MixedStreamLayoutRegionConfig region : regions) {
+            if (region != null && !region.getIsLocalUser() && TextUtils.equals(userId, mCoHostInfo.coHostUserId)) {
+                region.setMediaType(isMute
+                        ? MixedStreamConfig.MixedStreamMediaType.MIXED_STREAM_MEDIA_TYPE_VIDEO_ONLY
+                        : MixedStreamConfig.MixedStreamMediaType.MIXED_STREAM_MEDIA_TYPE_AUDIO_AND_VIDEO);
                 break;
             }
         }
         if (mRTCVideo != null) {
-            mRTCVideo.updateLiveTranscoding("", mLiveTranscoding);
+            mRTCVideo.updatePushMixedStreamToCDN("", mMixedStreamConfig);
         }
     }
 
@@ -917,45 +984,55 @@ public class LiveRTCManager {
      * @param liveUrl 直播的url
      * @param audienceUserIdList 观众id列表，传null意味着结束共享
      */
+    /**
+     * {en}
+     * Update the layout of the audience's params
+     *
+     * @param roomId             room id
+     * @param selfUserId         the anchor's user id
+     * @param liveUrl            live URL
+     * @param audienceUserIdList audience id list, passing null means end sharing
+     */
     public void updateLiveTranscodingWithAudience(String roomId, String selfUserId, String liveUrl,
-                                                   List<String> audienceUserIdList) {
+                                                  List<String> audienceUserIdList) {
 
         mAudienceUserIdList = audienceUserIdList;
 
-        LiveTranscoding liveTranscoding = LiveTranscoding.getDefualtLiveTranscode();
-        liveTranscoding.setRoomId(roomId);
-        liveTranscoding.setUrl(liveUrl);
-        liveTranscoding.setMixType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
+        MixedStreamConfig config = MixedStreamConfig.defaultMixedStreamConfig();
+        config.setRoomID(roomId);
+        config.setPushURL(liveUrl);
+        config.setExpectedMixingType(ByteRTCStreamMixingType.STREAM_MIXING_BY_SERVER);
 
-        LiveTranscoding.VideoConfig videoConfig = liveTranscoding.getVideo();
+        MixedStreamVideoConfig videoConfig =  config.getVideoConfig();
         videoConfig.setWidth(mHostConfig.width);
         videoConfig.setHeight(mHostConfig.height);
         videoConfig.setFps(mHostConfig.frameRate);
-        videoConfig.setKBitRate(mHostConfig.bitRate);
-        liveTranscoding.setVideo(videoConfig);
+        videoConfig.setBitrate(mHostConfig.bitRate);
 
-        LiveTranscoding.AudioConfig audioConfig = liveTranscoding.getAudio();
+        MixedStreamAudioConfig audioConfig =  config.getAudioConfig();
         audioConfig.setSampleRate(44100);
         audioConfig.setChannels(2);
-        liveTranscoding.setAudio(audioConfig);
 
-        LiveTranscoding.Layout.Builder layoutBuilder = new LiveTranscoding.Layout.Builder();
-        LiveTranscoding.Region selfRegion = new LiveTranscoding.Region();
-        selfRegion.uid(selfUserId);
-        selfRegion.roomId(roomId);
-        selfRegion.position(0, 0);
-        selfRegion.size(1, 1);
-        selfRegion.alpha(1);
-        selfRegion.zorder(0);
-        layoutBuilder.addRegion(selfRegion);
-
+        MixedStreamLayoutConfig layoutConfig = new MixedStreamLayoutConfig();
+        List<MixedStreamLayoutRegionConfig> regions = new ArrayList<>();
+        {
+            MixedStreamLayoutRegionConfig localRegion = new MixedStreamLayoutRegionConfig();
+            localRegion.setUserID(selfUserId);
+            localRegion.setRoomID(roomId);
+            localRegion.setLocationX(0);
+            localRegion.setLocationY(0);
+            localRegion.setWidthProportion(1);
+            localRegion.setHeightProportion(1);
+            localRegion.setAlpha(1);
+            localRegion.setZOrder(0);
+            regions.add(localRegion);
+        }
         if (audienceUserIdList != null && audienceUserIdList.size() > 1) {
             mIsTranscoding = true;
-
             for (int i = 1; i < audienceUserIdList.size(); i++) {
-                LiveTranscoding.Region region = new LiveTranscoding.Region();
-                region.uid(audienceUserIdList.get(i));
-                region.roomId(roomId);
+                MixedStreamLayoutRegionConfig region = new MixedStreamLayoutRegionConfig();
+                region.setUserID(audienceUserIdList.get(i));
+                region.setRoomID(roomId);
                 float screenWidth = 365;
                 float screenHeight = 667;
                 float itemHeight = 80;
@@ -967,21 +1044,24 @@ public class LiveRTCManager {
                 float regionWidth = regionHeight * screenHeight / screenWidth;
                 float regionY = (itemTopSpace - (itemHeight + itemSpace) * index) / screenHeight;
                 float regionX = 1 - (regionHeight * screenHeight + itemRightSpace) / screenWidth;
-                region.position(regionX, regionY);
-                region.size(regionWidth, regionHeight);
-                region.zorder(1);
-                region.alpha(1);
-                layoutBuilder.addRegion(region);
+                region.setLocationX(regionX);
+                region.setLocationY(regionY);
+                region.setWidthProportion(regionWidth);
+                region.setHeightProportion(regionHeight);
+                region.setZOrder(1);
+                region.setAlpha(1);
+                regions.add(region);
             }
         } else {
             mIsTranscoding = false;
         }
         JsonObject json = new JsonObject();
-        json.addProperty("kLiveCoreSEIKEYSource", "kLiveCoreSEIValueSourceNone");
-        layoutBuilder.appData(json.toString());
-        liveTranscoding.setLayout(layoutBuilder.builder());
+        json.addProperty(KEY_SEI_KEY_SOURCE, KEY_SEI_VALUE_SOURCE_NONE);
+        layoutConfig.setUserConfigExtraInfo(json.toString());
+        layoutConfig.setRegions(regions.toArray(new MixedStreamLayoutRegionConfig[]{}));
+        config.setLayout(layoutConfig);
 
-        mRTCVideo.updateLiveTranscoding("", liveTranscoding);
+        mRTCVideo.updatePushMixedStreamToCDN("", config);
     }
 
     /**
@@ -993,9 +1073,20 @@ public class LiveRTCManager {
      * @param selfUserId 自己的userId
      * @param pushUrl 推流地址
      */
+    /**
+     * {en}
+     * Push your own video stream to other rooms
+     *
+     * @param coHostRoomId The roomId of the other party's room
+     * @param coHostUserId The other party's userId
+     * @param token        Token used to forward media stream to this room
+     * @param selfRoomId   the roomId of your own room
+     * @param selfUserId   own userId
+     * @param pushUrl      push URL
+     */
     public void startForwardStreamToRooms(String coHostRoomId, String coHostUserId, String token,
                                           String selfRoomId, String selfUserId, String pushUrl) {
-        mCoHostInfo = new LiveTranscodingInfo(pushUrl, selfRoomId, selfUserId, coHostRoomId, coHostUserId);
+        mCoHostInfo = new MixedStreamInfo(pushUrl, selfRoomId, selfUserId, coHostRoomId, coHostUserId);
 
         ForwardStreamInfo forwardStreamInfo = new ForwardStreamInfo(coHostRoomId, token);
         if (mRTCRoom != null) {
@@ -1013,6 +1104,13 @@ public class LiveRTCManager {
      * @param coHostVideoWidth  对方主播视频的宽
      * @param coHostVideoHeight  对方主播视频的高
      */
+    /**
+     * {en}
+     * Set the host video resolution of the other anchor
+     *
+     * @param coHostVideoWidth  The width of the host's video
+     * @param coHostVideoHeight The height of the host's video
+     */
     public void setCoHostVideoConfig(int coHostVideoWidth, int coHostVideoHeight) {
         mCoHostVideoWidth = coHostVideoWidth;
         mCoHostVideoHeight = coHostVideoHeight;
@@ -1020,6 +1118,10 @@ public class LiveRTCManager {
 
     /**
      * 停止自己的视频流推送到其他房间
+     */
+    /**
+     * {en}
+     * Stop pushing your own video stream to other rooms
      */
     public void stopLiveTranscodingWithHost() {
         Log.d(TAG, "stopLiveTranscodingWithHost");
@@ -1032,6 +1134,10 @@ public class LiveRTCManager {
     /**
      * 初始化视频美颜
      */
+    /**
+     * {en}
+     * Initialize video beauty
+     */
     private void initVideoEffect() {
         IEffect effect = ProtocolUtil.getIEffect();
         if (effect != null) {
@@ -1042,6 +1148,12 @@ public class LiveRTCManager {
     /**
      * 打开美颜对话框
      * @param context 上下文对象
+     */
+    /**
+     * {en}
+     * Open the beauty dialog
+     *
+     * @param context context object
      */
     public void openEffectDialog(Context context) {
         IEffect effect = ProtocolUtil.getIEffect();
